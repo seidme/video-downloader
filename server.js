@@ -20,6 +20,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Downloads directory & Storage Limit (2 GB max)
 const DOWNLOADS_DIR = path.join(__dirname, 'downloads');
 const MAX_STORAGE_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB
+const BYPASS_PASSWORD = 'leptir';
 
 if (!fs.existsSync(DOWNLOADS_DIR)) {
   fs.mkdirSync(DOWNLOADS_DIR, { recursive: true });
@@ -172,6 +173,15 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// POST /api/bypass/verify - Verify bypass password on backend
+app.post('/api/bypass/verify', (req, res) => {
+  const { password } = req.body || {};
+  if (password === BYPASS_PASSWORD) {
+    return res.json({ valid: true, message: 'Password verified.' });
+  }
+  return res.status(401).json({ valid: false, error: 'Incorrect password. Hint: slija' });
+});
+
 // POST /api/info - Fetch metadata for any video URL
 app.post('/api/info', async (req, res) => {
   const { url } = req.body;
@@ -278,6 +288,8 @@ app.post('/api/info', async (req, res) => {
         uploaderUrl: data.uploader_url || data.channel_url || null,
         duration: data.duration,
         durationFormatted: formatDuration(data.duration),
+        filesize: data.filesize || data.filesize_approx || null,
+        isSizeRestricted: !!((data.filesize && data.filesize > 1024 * 1024 * 1024) || (data.filesize_approx && data.filesize_approx > 1024 * 1024 * 1024)),
         views: formatCount(data.view_count),
         likes: formatCount(data.like_count),
         thumbnail,
@@ -301,9 +313,21 @@ app.post('/api/info', async (req, res) => {
 
 // POST /api/download/start - Initiate asynchronous download
 app.post('/api/download/start', (req, res) => {
-  const { url, type, quality, title } = req.body;
+  const { url, type, quality, title, duration, bypassPassword } = req.body;
   if (!url) {
     return res.status(400).json({ error: 'URL is required.' });
+  }
+
+  const isVideo = type !== 'audio';
+  const durationOver1h = typeof duration === 'number' && duration > 3600;
+  const isBypassed = bypassPassword === 'leptir';
+
+  if (isVideo && durationOver1h && !isBypassed) {
+    return res.status(403).json({
+      error: 'Videos longer than 1 hour require bypass password (Hint: slija).',
+      restricted: true,
+      hint: 'slija'
+    });
   }
 
   const safeTitle = sanitizeFilename(title);
@@ -389,6 +413,11 @@ app.post('/api/download/start', (req, res) => {
     }
     args.push('-f', formatFilter);
     args.push('--merge-output-format', 'mp4');
+  }
+
+  // Unless bypassed with password, enforce 1 GB (1024M) max file size
+  if (!isBypassed) {
+    args.push('--max-filesize', '1024M');
   }
 
   args.push(url.trim());
@@ -493,7 +522,11 @@ app.post('/api/download/start', (req, res) => {
       console.log(`✅ Download complete: "${targetFilename}"`);
     } else {
       job.status = 'error';
-      job.error = fullStderr.trim() || 'Downloaded file not found on disk.';
+      if (fullStderr.includes('larger than max-filesize') || fullStderr.includes('max-filesize')) {
+        job.error = 'File exceeds 1 GB limit. Enter bypass password to download (Hint: slija).';
+      } else {
+        job.error = fullStderr.trim() || 'Downloaded file not found on disk.';
+      }
     }
   });
 

@@ -28,6 +28,16 @@ const qualityOptions = document.getElementById('qualityOptions');
 const startDownloadBtn = document.getElementById('startDownloadBtn');
 const downloadBtnText = document.getElementById('downloadBtnText');
 
+// Restriction & Bypass DOM
+const restrictionBox = document.getElementById('restrictionBox');
+const restrictionTitle = document.getElementById('restrictionTitle');
+const restrictionDesc = document.getElementById('restrictionDesc');
+const bypassPasswordInput = document.getElementById('bypassPasswordInput');
+const bypassBtn = document.getElementById('bypassBtn');
+const bypassMessage = document.getElementById('bypassMessage');
+
+let isBypassed = false;
+
 // Progress DOM
 const progressSection = document.getElementById('progressSection');
 const progressStatusText = document.getElementById('progressStatusText');
@@ -123,6 +133,19 @@ function setupEventListeners() {
     localStorage.removeItem('download_history');
     renderHistory();
   });
+
+  // Restriction Bypass
+  if (bypassBtn) {
+    bypassBtn.addEventListener('click', handleBypassAttempt);
+  }
+  if (bypassPasswordInput) {
+    bypassPasswordInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleBypassAttempt();
+      }
+    });
+  }
 }
 
 // Show/Hide Alert
@@ -184,6 +207,15 @@ function renderMediaPreview(media) {
     viewsStatWrapper.style.display = 'none';
   }
 
+  // Reset restriction state for new media
+  isBypassed = false;
+  if (bypassPasswordInput) bypassPasswordInput.value = '';
+  if (bypassMessage) {
+    bypassMessage.textContent = '';
+    bypassMessage.className = 'bypass-message';
+  }
+  if (restrictionBox) restrictionBox.classList.remove('unlocked');
+
   // Default to video mode
   switchMode('video');
 
@@ -218,7 +250,109 @@ function switchMode(mode) {
     tabVideo.classList.remove('active');
     renderQualityChips(currentMedia?.audioQualities || []);
   }
-  updateDownloadButtonText();
+  checkRestrictionState();
+}
+
+// Check and handle restrictions (Max 1h video, 1GB file, audio is allowed)
+function checkRestrictionState() {
+  if (!currentMedia) return;
+
+  const isVideo = currentMode === 'video';
+  const durationOver1h = (currentMedia.duration || 0) > 3600;
+  const sizeOver1gb = (currentMedia.filesize || 0) > 1024 * 1024 * 1024 || !!currentMedia.isSizeRestricted;
+
+  // Video duration over 1h only applies if video mode (audio is allowed)
+  // File size over 1GB applies in general
+  const isRestricted = (isVideo && durationOver1h) || sizeOver1gb;
+
+  if (isRestricted && !isBypassed) {
+    if (restrictionBox) {
+      restrictionBox.style.display = 'block';
+      restrictionBox.classList.remove('unlocked');
+      
+      let reason = '';
+      if (isVideo && durationOver1h && sizeOver1gb) {
+        reason = 'This video is longer than 1 hour and exceeds 1 GB file size.';
+      } else if (isVideo && durationOver1h) {
+        reason = 'This video is longer than 1 hour (max 1h for video; audio is allowed).';
+      } else if (sizeOver1gb) {
+        reason = 'This file exceeds the 1 GB file size limit.';
+      }
+
+      restrictionTitle.textContent = 'Download Restriction';
+      restrictionDesc.textContent = `${reason} Enter password to bypass restriction.`;
+    }
+    startDownloadBtn.disabled = true;
+    startDownloadBtn.style.opacity = '0.65';
+    startDownloadBtn.style.cursor = 'not-allowed';
+    downloadBtnText.textContent = 'Download Locked (Password Required)';
+  } else {
+    if (isBypassed && isRestricted) {
+      if (restrictionBox) {
+        restrictionBox.style.display = 'block';
+        restrictionBox.classList.add('unlocked');
+        restrictionTitle.textContent = '✓ Restriction Bypassed';
+        restrictionDesc.textContent = 'Password verified. You can now download this media.';
+      }
+    } else {
+      if (restrictionBox) restrictionBox.style.display = 'none';
+    }
+    startDownloadBtn.disabled = false;
+    startDownloadBtn.style.opacity = '1';
+    startDownloadBtn.style.cursor = 'pointer';
+    updateDownloadButtonText();
+  }
+}
+
+async function handleBypassAttempt() {
+  const pwd = bypassPasswordInput ? bypassPasswordInput.value.trim() : '';
+  if (!pwd) {
+    if (bypassMessage) {
+      bypassMessage.textContent = 'Please enter password. Hint: slija';
+      bypassMessage.className = 'bypass-message error';
+    }
+    if (bypassPasswordInput) bypassPasswordInput.focus();
+    return;
+  }
+
+  if (bypassBtn) bypassBtn.disabled = true;
+  if (bypassMessage) {
+    bypassMessage.textContent = 'Verifying...';
+    bypassMessage.className = 'bypass-message';
+  }
+
+  try {
+    const res = await fetch('/api/bypass/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pwd })
+    });
+
+    const data = await res.json();
+    if (res.ok && data.valid) {
+      isBypassed = true;
+      if (bypassMessage) {
+        bypassMessage.textContent = '✓ Unlocked!';
+        bypassMessage.className = 'bypass-message success';
+      }
+      checkRestrictionState();
+    } else {
+      isBypassed = false;
+      if (bypassMessage) {
+        bypassMessage.textContent = data.error || 'Incorrect password. Hint: slija';
+        bypassMessage.className = 'bypass-message error';
+      }
+      if (bypassPasswordInput) bypassPasswordInput.focus();
+      checkRestrictionState();
+    }
+  } catch (err) {
+    if (bypassMessage) {
+      bypassMessage.textContent = 'Verification error. Try again.';
+      bypassMessage.className = 'bypass-message error';
+    }
+  } finally {
+    if (bypassBtn) bypassBtn.disabled = false;
+  }
 }
 
 // Render Quality Selection Chips
@@ -257,6 +391,18 @@ function renderQualityChips(qualities) {
 async function startDownload() {
   if (!currentMedia) return;
 
+  const isVideo = currentMode === 'video';
+  const durationOver1h = (currentMedia.duration || 0) > 3600;
+  const sizeOver1gb = (currentMedia.filesize || 0) > 1024 * 1024 * 1024 || !!currentMedia.isSizeRestricted;
+  const isRestricted = (isVideo && durationOver1h) || sizeOver1gb;
+
+  if (isRestricted && !isBypassed) {
+    checkRestrictionState();
+    if (restrictionBox) restrictionBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (bypassPasswordInput) bypassPasswordInput.focus();
+    return;
+  }
+
   hideAlert();
   startDownloadBtn.disabled = true;
   fetchBtn.disabled = true;
@@ -280,7 +426,9 @@ async function startDownload() {
         url: currentMedia.webpageUrl,
         type: currentMode,
         quality: selectedQuality,
-        title: currentMedia.title
+        title: currentMedia.title,
+        duration: currentMedia.duration,
+        bypassPassword: isBypassed ? 'leptir' : (bypassPasswordInput ? bypassPasswordInput.value.trim() : '')
       })
     });
 

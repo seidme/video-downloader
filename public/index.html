@@ -155,6 +155,32 @@
                 </div>
               </div>
 
+              <!-- Restriction Notification & Bypass Input -->
+              <div class="restriction-box" id="restrictionBox" style="display: none;">
+                <div class="restriction-header">
+                  <div class="restriction-icon">⏱️</div>
+                  <div class="restriction-text">
+                    <strong id="restrictionTitle">Download Restriction</strong>
+                    <p id="restrictionDesc">Videos are limited to 1 hour max, and file size must be under 1 GB (audio is allowed). Enter password to bypass.</p>
+                  </div>
+                </div>
+                <div class="bypass-control">
+                  <div class="bypass-input-wrap">
+                    <input 
+                      type="password" 
+                      id="bypassPasswordInput" 
+                      placeholder="Enter password to bypass..."
+                      autocomplete="off"
+                    />
+                    <button type="button" class="btn-bypass" id="bypassBtn">Bypass</button>
+                  </div>
+                  <div class="bypass-hint-wrap">
+                    <span class="bypass-hint">Hint: slija</span>
+                    <span class="bypass-message" id="bypassMessage"></span>
+                  </div>
+                </div>
+              </div>
+
               <!-- Download Action CTA -->
               <div class="action-row">
                 <button type="button" class="btn-download" id="startDownloadBtn">
