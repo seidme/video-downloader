@@ -79,17 +79,34 @@ function getUrlHash(url) {
   return crypto.createHash('md5').update(url.trim()).digest('hex').substring(0, 6);
 }
 
-function getExistingDownload(url, quality) {
+function getExistingDownload(url, quality, title = '', type = 'video') {
   if (!url || !quality) return null;
   const hash = getUrlHash(url);
+  const ext = type === 'audio' ? (quality === 'm4a' ? 'm4a' : 'mp3') : 'mp4';
+  const safeTitle = sanitizeFilename(title);
+  const exactFilename = `${safeTitle} [${quality}] [${hash}].${ext}`;
+  const exactPath = path.join(DOWNLOADS_DIR, exactFilename);
 
-  try {
-    const files = fs.readdirSync(DOWNLOADS_DIR);
-    const match = files.find(f => f.includes(`[${quality}] [${hash}].`));
-    if (!match) return null;
+  let filePath = null;
+  let downloadFilename = null;
 
-    const filePath = path.join(DOWNLOADS_DIR, match);
-    const downloadFilename = match; // Keep full filename as-is (no stripping)
+  // 1. Direct exact full filename match
+  if (title && fs.existsSync(exactPath)) {
+    filePath = exactPath;
+    downloadFilename = exactFilename;
+  } else {
+    // 2. Match by ending tag [quality] [hash].ext if title was not passed
+    try {
+      const files = fs.readdirSync(DOWNLOADS_DIR);
+      const match = files.find(f => f.endsWith(`[${quality}] [${hash}].${ext}`));
+      if (match) {
+        filePath = path.join(DOWNLOADS_DIR, match);
+        downloadFilename = match;
+      }
+    } catch (e) { }
+  }
+
+  if (!filePath) return null;
 
     // Reuse existing in-memory job or create a transient one
     let existingJobId = null;
@@ -122,9 +139,6 @@ function getExistingDownload(url, quality) {
       filePath,
       downloadFilename
     };
-  } catch (e) {
-    return null;
-  }
 }
 
 // GET /api/health - Check engine status
@@ -274,9 +288,15 @@ app.post('/api/download/start', (req, res) => {
     return res.status(400).json({ error: 'URL is required.' });
   }
 
-  // If user already downloaded this exact URL & quality, offer to save immediately!
+  const safeTitle = sanitizeFilename(title);
+  const ext = type === 'audio' ? (quality === 'm4a' ? 'm4a' : 'mp3') : 'mp4';
+  const urlHash = getUrlHash(url);
   const qTag = quality || (type === 'audio' ? '320k' : 'best');
-  const existing = getExistingDownload(url, qTag);
+  const targetFilename = `${safeTitle} [${qTag}] [${urlHash}].${ext}`;
+  const targetFilePath = path.join(DOWNLOADS_DIR, targetFilename);
+
+  // 1. If user already downloaded this exact file, offer to save immediately!
+  const existing = getExistingDownload(url, qTag, title, type);
   if (existing) {
     console.log(`⚡ Already downloaded file requested, offering immediate save: "${existing.downloadFilename}"`);
     return res.json({
@@ -307,9 +327,6 @@ app.post('/api/download/start', (req, res) => {
 
   // 3. Otherwise, start fresh download
   const jobId = crypto.randomUUID();
-  const safeTitle = sanitizeFilename(title);
-  const ext = type === 'audio' ? (quality === 'm4a' ? 'm4a' : 'mp3') : 'mp4';
-  const urlHash = getUrlHash(url);
   const outputTemplate = path.join(DOWNLOADS_DIR, `${safeTitle} [${qTag}] [${urlHash}].%(ext)s`);
 
   // Build yt-dlp arguments
@@ -396,19 +413,27 @@ app.post('/api/download/start', (req, res) => {
 
   child.on('close', code => {
     if (code === 0) {
-      // Find output file by exact [quality] [hash] tag
-      const files = fs.readdirSync(DOWNLOADS_DIR);
-      const expectedTag = `[${qTag}] [${urlHash}].`;
-      const match = files.find(f => f.includes(expectedTag));
-      if (match) {
-        job.filePath = path.join(DOWNLOADS_DIR, match);
-        job.downloadFilename = match; // Exact filename on disk, no stripping needed
+      // 1. Direct exact filename check
+      if (fs.existsSync(targetFilePath)) {
+        job.filePath = targetFilePath;
+        job.downloadFilename = targetFilename;
         job.status = 'completed';
         job.percent = 100;
         console.log(`✅ Download complete: "${job.downloadFilename}"`);
       } else {
-        job.status = 'error';
-        job.error = 'Downloaded file not found on disk.';
+        // Fallback in case container format was muxed with a different extension
+        const files = fs.readdirSync(DOWNLOADS_DIR);
+        const match = files.find(f => f.startsWith(safeTitle) && f.includes(`[${qTag}] [${urlHash}].`));
+        if (match) {
+          job.filePath = path.join(DOWNLOADS_DIR, match);
+          job.downloadFilename = match;
+          job.status = 'completed';
+          job.percent = 100;
+          console.log(`✅ Download complete: "${job.downloadFilename}"`);
+        } else {
+          job.status = 'error';
+          job.error = 'Downloaded file not found on disk.';
+        }
       }
     } else {
       job.status = 'error';
