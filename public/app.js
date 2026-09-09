@@ -150,96 +150,45 @@ function setupEventListeners() {
 
   // Server Stats & Audit Console Inspector
   const serverStatsBtn = document.getElementById('serverStatsBtn');
-  const serverStatsBtnText = document.getElementById('serverStatsBtnText');
-
   if (serverStatsBtn) {
     serverStatsBtn.addEventListener('click', async () => {
       try {
-        if (serverStatsBtnText) serverStatsBtnText.textContent = 'Checking...';
-        serverStatsBtn.disabled = true;
-
         const res = await fetch('/api/stats?limit=100');
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-
         console.log(data);
-
-        if (serverStatsBtnText) serverStatsBtnText.textContent = '✓ Logged to Console';
-        setTimeout(() => {
-          if (serverStatsBtnText) serverStatsBtnText.textContent = 'All Stats';
-          serverStatsBtn.disabled = false;
-        }, 3000);
       } catch (err) {
         console.error('Failed to fetch server stats:', err);
-        if (serverStatsBtnText) serverStatsBtnText.textContent = 'Error';
-        setTimeout(() => {
-          if (serverStatsBtnText) serverStatsBtnText.textContent = 'All Stats';
-          serverStatsBtn.disabled = false;
-        }, 3000);
       }
     });
   }
 
   // OK Stats (Successful downloads / conversions only)
   const okStatsBtn = document.getElementById('okStatsBtn');
-  const okStatsBtnText = document.getElementById('okStatsBtnText');
-
   if (okStatsBtn) {
     okStatsBtn.addEventListener('click', async () => {
       try {
-        if (okStatsBtnText) okStatsBtnText.textContent = 'Checking...';
-        okStatsBtn.disabled = true;
-
         const res = await fetch('/api/stats?filter=ok&limit=100');
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-
         console.log(data);
-
-        if (okStatsBtnText) okStatsBtnText.textContent = '✓ Logged to Console';
-        setTimeout(() => {
-          if (okStatsBtnText) okStatsBtnText.textContent = 'OK Stats';
-          okStatsBtn.disabled = false;
-        }, 3000);
       } catch (err) {
         console.error('Failed to fetch OK stats:', err);
-        if (okStatsBtnText) okStatsBtnText.textContent = 'Error';
-        setTimeout(() => {
-          if (okStatsBtnText) okStatsBtnText.textContent = 'OK Stats';
-          okStatsBtn.disabled = false;
-        }, 3000);
       }
     });
   }
 
   // Error Stats (Errors, blocked restrictions, failed downloads)
   const errorStatsBtn = document.getElementById('errorStatsBtn');
-  const errorStatsBtnText = document.getElementById('errorStatsBtnText');
-
   if (errorStatsBtn) {
     errorStatsBtn.addEventListener('click', async () => {
       try {
-        if (errorStatsBtnText) errorStatsBtnText.textContent = 'Checking...';
-        errorStatsBtn.disabled = true;
-
         const res = await fetch('/api/stats?filter=error&limit=100');
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-
         console.log(data);
-
-        if (errorStatsBtnText) errorStatsBtnText.textContent = '✓ Logged to Console';
-        setTimeout(() => {
-          if (errorStatsBtnText) errorStatsBtnText.textContent = 'Error Stats';
-          errorStatsBtn.disabled = false;
-        }, 3000);
       } catch (err) {
         console.error('Failed to fetch Error stats:', err);
-        if (errorStatsBtnText) errorStatsBtnText.textContent = 'Error';
-        setTimeout(() => {
-          if (errorStatsBtnText) errorStatsBtnText.textContent = 'Error Stats';
-          errorStatsBtn.disabled = false;
-        }, 3000);
       }
     });
   }
