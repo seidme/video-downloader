@@ -152,6 +152,19 @@ function renderMediaPreview(media) {
   resultCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
+function isQualityCached(type, qualityId) {
+  if (!currentMedia || !Array.isArray(currentMedia.cachedDownloads)) return false;
+  return currentMedia.cachedDownloads.some(c => c.type === type && c.quality === qualityId);
+}
+
+function updateDownloadButtonText() {
+  if (isQualityCached(currentMode, selectedQuality)) {
+    downloadBtnText.textContent = '⚡ Save Existing File (Instant)';
+  } else {
+    downloadBtnText.textContent = currentMode === 'video' ? 'Download Video (MP4)' : 'Download Audio (MP3)';
+  }
+}
+
 // Switch between Video and Audio Mode
 function switchMode(mode) {
   currentMode = mode;
@@ -159,14 +172,13 @@ function switchMode(mode) {
   if (mode === 'video') {
     tabVideo.classList.add('active');
     tabAudio.classList.remove('active');
-    downloadBtnText.textContent = 'Download Video (MP4)';
     renderQualityChips(currentMedia?.videoQualities || []);
   } else {
     tabAudio.classList.add('active');
     tabVideo.classList.remove('active');
-    downloadBtnText.textContent = 'Download Audio (MP3)';
     renderQualityChips(currentMedia?.audioQualities || []);
   }
+  updateDownloadButtonText();
 }
 
 // Render Quality Selection Chips
@@ -175,6 +187,7 @@ function renderQualityChips(qualities) {
   if (!qualities || qualities.length === 0) {
     qualityOptions.innerHTML = '<span style="color: var(--text-dim); font-size: 0.85rem;">Standard quality selected</span>';
     selectedQuality = 'best';
+    updateDownloadButtonText();
     return;
   }
 
@@ -184,17 +197,22 @@ function renderQualityChips(qualities) {
     const chip = document.createElement('button');
     chip.type = 'button';
     chip.className = `quality-chip ${index === 0 ? 'selected' : ''}`;
-    chip.textContent = q.label;
+    
+    const isCached = isQualityCached(currentMode, q.id);
+    chip.innerHTML = `${q.label}${isCached ? ' <span style="color: #10b981; font-weight: 700; margin-left: 4px;">⚡ Saved</span>' : ''}`;
     chip.dataset.id = q.id;
 
     chip.addEventListener('click', () => {
       document.querySelectorAll('.quality-chip').forEach(c => c.classList.remove('selected'));
       chip.classList.add('selected');
       selectedQuality = q.id;
+      updateDownloadButtonText();
     });
 
     qualityOptions.appendChild(chip);
   });
+
+  updateDownloadButtonText();
 }
 
 // Start Download Process
@@ -206,7 +224,7 @@ async function startDownload() {
   progressSection.style.display = 'block';
   progressBarFill.style.width = '0%';
   progressPercentText.textContent = '0%';
-  progressStatusText.textContent = 'Initializing media extraction...';
+  progressStatusText.textContent = 'Checking local storage & starting...';
   progressSpeed.textContent = '-- KiB/s';
   progressSize.textContent = '--';
   progressEta.textContent = '--:--';
@@ -226,6 +244,33 @@ async function startDownload() {
     const data = await res.json();
     if (!res.ok) {
       throw new Error(data.error || 'Failed to start download.');
+    }
+
+    // If file is already downloaded and present on server, save instantly!
+    if (data.cached) {
+      progressBarFill.style.width = '100%';
+      progressPercentText.textContent = '100%';
+      progressStatusText.textContent = '✓ Already downloaded! Saving to your computer...';
+      progressSpeed.textContent = 'Instant';
+      progressSize.textContent = 'Ready on Disk';
+      progressEta.textContent = '0s';
+      startDownloadBtn.disabled = false;
+
+      // Trigger browser save dialog immediately
+      triggerBrowserDownload(`/api/download/file/${data.jobId}`);
+
+      // Add to local history
+      saveToHistory({
+        title: currentMedia.title,
+        thumbnail: currentMedia.thumbnail,
+        platform: currentMedia.platform,
+        mode: currentMode,
+        quality: selectedQuality,
+        downloadUrl: `/api/download/file/${data.jobId}`,
+        filename: data.downloadFilename,
+        timestamp: Date.now()
+      });
+      return;
     }
 
     pollJobProgress(data.jobId);

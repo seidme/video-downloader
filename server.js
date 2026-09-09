@@ -73,6 +73,69 @@ function sanitizeFilename(name) {
     .substring(0, 150);
 }
 
+// Downloads Cache & Registry
+const REGISTRY_FILE = path.join(DOWNLOADS_DIR, 'downloads-cache.json');
+
+function normalizeUrl(rawUrl) {
+  if (!rawUrl) return '';
+  try {
+    const parsed = new URL(rawUrl.trim());
+    if (parsed.hostname.includes('youtube.com') || parsed.hostname.includes('youtu.be')) {
+      let id = parsed.searchParams.get('v');
+      if (!id && parsed.hostname.includes('youtu.be')) {
+        id = parsed.pathname.slice(1).split('/')[0];
+      }
+      if (id) return `youtube:${id}`;
+    }
+    ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'si', 'fbclid'].forEach(p => parsed.searchParams.delete(p));
+    let clean = parsed.origin + parsed.pathname.replace(/\/$/, '') + (parsed.search || '');
+    return clean.toLowerCase();
+  } catch (e) {
+    return rawUrl.trim().toLowerCase();
+  }
+}
+
+function getCacheKey(url, type, quality) {
+  const norm = normalizeUrl(url);
+  return crypto.createHash('sha256').update(`${norm}::${type}::${quality}`).digest('hex');
+}
+
+function loadCache() {
+  try {
+    if (fs.existsSync(REGISTRY_FILE)) {
+      return JSON.parse(fs.readFileSync(REGISTRY_FILE, 'utf-8'));
+    }
+  } catch (e) {
+    console.error('Error reading downloads-cache.json:', e);
+  }
+  return {};
+}
+
+function saveCache(cache) {
+  try {
+    fs.writeFileSync(REGISTRY_FILE, JSON.stringify(cache, null, 2));
+  } catch (e) {
+    console.error('Error saving downloads-cache.json:', e);
+  }
+}
+
+function findCachedDownload(url, type, quality) {
+  const cache = loadCache();
+  const key = getCacheKey(url, type, quality);
+  const entry = cache[key];
+  if (entry && entry.filePath && fs.existsSync(entry.filePath)) {
+    return entry;
+  }
+  return null;
+}
+
+function saveCachedDownload(url, type, quality, entry) {
+  const cache = loadCache();
+  const key = getCacheKey(url, type, quality);
+  cache[key] = entry;
+  saveCache(cache);
+}
+
 // GET /api/health - Check engine status
 app.get('/api/health', (req, res) => {
   const ytProc = spawn(YTDLP_BIN, ['--version']);
@@ -173,6 +236,19 @@ app.post('/api/info', async (req, res) => {
         { id: 'm4a', label: 'M4A - AAC Audio', ext: 'm4a' }
       ];
 
+      // Check which formats are already cached locally on disk
+      const cachedDownloads = [];
+      for (const vq of availableVideoQualities) {
+        if (findCachedDownload(trimmedUrl, 'video', vq.id)) {
+          cachedDownloads.push({ type: 'video', quality: vq.id });
+        }
+      }
+      for (const aq of availableAudioQualities) {
+        if (findCachedDownload(trimmedUrl, 'audio', aq.id)) {
+          cachedDownloads.push({ type: 'audio', quality: aq.id });
+        }
+      }
+
       res.json({
         id: data.id,
         title: data.title || 'Untitled Media',
@@ -186,7 +262,8 @@ app.post('/api/info', async (req, res) => {
         thumbnail,
         webpageUrl: data.webpage_url || trimmedUrl,
         videoQualities: availableVideoQualities,
-        audioQualities: availableAudioQualities
+        audioQualities: availableAudioQualities,
+        cachedDownloads
       });
     } catch (parseErr) {
       console.error('Failed to parse metadata JSON:', parseErr);
@@ -206,6 +283,42 @@ app.post('/api/download/start', (req, res) => {
     return res.status(400).json({ error: 'URL is required.' });
   }
 
+  // 1. Check if this video & quality is already downloaded and exists in downloads/
+  const cached = findCachedDownload(url, type, quality);
+  if (cached) {
+    const existingJobId = cached.jobId || crypto.randomUUID();
+    jobs.set(existingJobId, {
+      jobId: existingJobId,
+      url: cached.url,
+      type: cached.type,
+      quality: cached.quality,
+      safeTitle: cached.safeTitle,
+      targetExt: cached.targetExt,
+      status: 'completed',
+      percent: 100,
+      speed: 'Instant (Cached)',
+      eta: '0s',
+      totalSize: 'Ready',
+      filePath: cached.filePath,
+      downloadFilename: cached.downloadFilename,
+      error: null,
+      fileReady: true,
+      cached: true,
+      createdAt: Date.now()
+    });
+
+    console.log(`⚡ Serving cached download for: "${cached.downloadFilename}"`);
+    return res.json({
+      jobId: existingJobId,
+      cached: true,
+      fileReady: true,
+      downloadFilename: cached.downloadFilename,
+      downloadUrl: `/api/download/file/${existingJobId}`,
+      message: 'File already downloaded on disk! Ready to save.'
+    });
+  }
+
+  // 2. Otherwise, start fresh download
   const jobId = crypto.randomUUID();
   const safeTitle = sanitizeFilename(title);
   const ext = type === 'audio' ? (quality === 'm4a' ? 'm4a' : 'mp3') : 'mp4';
@@ -309,6 +422,19 @@ app.post('/api/download/start', (req, res) => {
         job.downloadFilename = `${safeTitle}.${actualExt}`;
         job.status = 'completed';
         job.percent = 100;
+
+        // Persist to downloads cache so it can be saved instantly again!
+        saveCachedDownload(url, type, quality, {
+          jobId,
+          url: url.trim(),
+          type,
+          quality,
+          safeTitle,
+          downloadFilename: job.downloadFilename,
+          filePath: job.filePath,
+          targetExt: actualExt,
+          downloadedAt: Date.now()
+        });
       } else {
         job.status = 'error';
         job.error = 'Downloaded file not found on disk.';
@@ -363,21 +489,34 @@ app.get('/api/download/file/:jobId', (req, res) => {
   });
 });
 
-// Periodic cleanup of downloads older than 60 minutes
+// Periodic cleanup of downloads older than 24 hours (preserves active cache)
 setInterval(() => {
   try {
     const now = Date.now();
     const files = fs.readdirSync(DOWNLOADS_DIR);
     for (const file of files) {
+      if (file === 'downloads-cache.json') continue;
       const fullPath = path.join(DOWNLOADS_DIR, file);
       const stat = fs.statSync(fullPath);
-      if (now - stat.mtimeMs > 60 * 60 * 1000) {
+      // Clean files older than 24 hours
+      if (now - stat.mtimeMs > 24 * 60 * 60 * 1000) {
         fs.unlinkSync(fullPath);
       }
     }
+    // Prune stale cache entries
+    const cache = loadCache();
+    let changed = false;
+    for (const key of Object.keys(cache)) {
+      if (!cache[key].filePath || !fs.existsSync(cache[key].filePath)) {
+        delete cache[key];
+        changed = true;
+      }
+    }
+    if (changed) saveCache(cache);
+
     // Clean old jobs from map
     for (const [id, job] of jobs.entries()) {
-      if (now - job.createdAt > 60 * 60 * 1000) {
+      if (now - job.createdAt > 24 * 60 * 60 * 1000) {
         jobs.delete(id);
       }
     }
