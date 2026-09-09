@@ -162,50 +162,7 @@ function setupEventListeners() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
 
-        // Print formatted stats and audit logs to browser console
-        console.group('%c📊 Video Downloader — Server Health & History Stats', 'color: #38bdf8; font-size: 14px; font-weight: bold;');
-        console.log('%cTimestamp:%c ' + new Date(data.timestamp).toLocaleString(), 'font-weight: bold; color: #94a3b8;', 'color: #f8fafc;');
-        console.log('%cStatus:%c ' + data.status.toUpperCase(), 'font-weight: bold; color: #94a3b8;', 'color: #4ade80; font-weight: bold;');
-        console.log('%cActive Jobs:%c ' + data.activeJobs, 'font-weight: bold; color: #94a3b8;', 'color: #f8fafc;');
-
-        console.group('%c📁 History & Storage', 'color: #818cf8; font-weight: bold;');
-        console.log('%cFiles in History:%c ' + (data.history?.fileCount ?? 0), 'font-weight: bold; color: #94a3b8;', 'color: #38bdf8; font-weight: bold;');
-        console.log('%cTotal Size:%c ' + (data.history?.totalFormatted ?? '0 B') + ' (' + Number(data.history?.totalBytes || 0).toLocaleString() + ' bytes)', 'font-weight: bold; color: #94a3b8;', 'color: #38bdf8; font-weight: bold;');
-        if (data.history?.biggestFile) {
-          console.log('%cBiggest File:%c ' + data.history.biggestFile.filename + ' (' + data.history.biggestFile.sizeFormatted + ' / ' + Number(data.history.biggestFile.sizeBytes).toLocaleString() + ' bytes)', 'font-weight: bold; color: #94a3b8;', 'color: #f59e0b; font-weight: bold;');
-        } else {
-          console.log('%cBiggest File:%c None (no files on disk)', 'font-weight: bold; color: #94a3b8;', 'color: #94a3b8;');
-        }
-        console.log('%cStorage Used:%c ' + data.storage.usedMB + ' MB / ' + data.storage.maxGB + ' GB (' + data.storage.usagePercent + '%)', 'font-weight: bold; color: #94a3b8;', 'color: #f8fafc;');
-        console.log('%cPurge Threshold:%c ' + data.storage.purgeThresholdMB + ' MB (60%)', 'font-weight: bold; color: #94a3b8;', 'color: #f8fafc;');
-
-        if (data.history?.files && data.history.files.length > 0) {
-          console.log('%cFiles on Disk:%c', 'font-weight: bold; color: #94a3b8;', '');
-          console.table(data.history.files.map(f => ({
-            'File Name': f.filename,
-            'Size': f.sizeFormatted,
-            'Bytes': Number(f.sizeBytes).toLocaleString(),
-            'Last Modified': new Date(f.mtimeMs).toLocaleString()
-          })));
-        }
-        console.groupEnd();
-
-        if (data.audit?.recentLogs && data.audit.recentLogs.length > 0) {
-          console.group('%c📜 Audit Log (Latest ' + data.audit.recentLogs.length + ' Events)', 'color: #f472b6; font-weight: bold;');
-          console.table(data.audit.recentLogs.map(l => ({
-            'Time': new Date(l.timestamp).toLocaleTimeString(),
-            'Action': l.action,
-            'IP': l.ip,
-            'Type': l.type || '-',
-            'Quality': l.quality || '-',
-            'File / Title': l.filename || l.title || '-',
-            'Size': l.fileSizeFormatted || '-',
-            'Cached': l.cached ? 'Yes' : 'No',
-            'Details': l.details || '-'
-          })));
-          console.groupEnd();
-        }
-        console.groupEnd();
+        console.log(data);
 
         if (serverStatsBtnText) serverStatsBtnText.textContent = '✓ Logged to Console';
         setTimeout(() => {
