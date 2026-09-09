@@ -18,19 +18,54 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Downloads directory & Storage Limit (2 GB max hard limit, purge at 60%)
-const DOWNLOADS_DIR = path.join(__dirname, 'downloads');
+// Unified persistent data directory with nested subfolders
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
+const DOWNLOADS_DIR = path.join(DATA_DIR, 'downloads');
+const COOKIES_DIR = path.join(DATA_DIR, 'cookies');
+const AUDIT_FILE = path.join(DATA_DIR, 'audit.json');
+
+// Ensure directories exist
+[DATA_DIR, DOWNLOADS_DIR, COOKIES_DIR].forEach(dir => {
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+});
+
 const MAX_STORAGE_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB max hard limit
 const PURGE_THRESHOLD_BYTES = MAX_STORAGE_BYTES * 0.6; // Start purging at 60% (1.2 GB)
 const MAX_FILE_SIZE_BYTES = 1024 * 1024 * 1024; // 1 GB
 const BYPASS_PASSWORD = 'leptir';
 
-if (!fs.existsSync(DOWNLOADS_DIR)) {
-  fs.mkdirSync(DOWNLOADS_DIR, { recursive: true });
-}
+// Audit Action Enum & Categorization
+const AuditAction = Object.freeze({
+  DOWNLOAD_START: 'download_start',
+  DOWNLOAD_COMPLETED: 'download_completed',
+  DOWNLOAD_CACHED_HIT: 'download_cached_hit',
+  DOWNLOAD_CANCELLED: 'download_cancelled',
+  DOWNLOAD_ERROR: 'download_error',
+  INFO_FETCH: 'info_fetch',
+  INFO_ERROR: 'info_error',
+  BYPASS_ATTEMPT: 'bypass_attempt',
+  RESTRICTION_BLOCKED: 'restriction_blocked',
+  ERROR: 'error'
+});
+
+const OK_AUDIT_ACTIONS = new Set([
+  AuditAction.DOWNLOAD_COMPLETED,
+  AuditAction.DOWNLOAD_CACHED_HIT
+]);
+
+const ERROR_AUDIT_ACTIONS = new Set([
+  AuditAction.DOWNLOAD_ERROR,
+  AuditAction.INFO_ERROR,
+  AuditAction.RESTRICTION_BLOCKED,
+  AuditAction.ERROR
+]);
+
+const isSuccessAuditLog = (log) => OK_AUDIT_ACTIONS.has(log.action);
+const isErrorAuditLog = (log) => 
+  ERROR_AUDIT_ACTIONS.has(log.action) ||
+  (log.action === AuditAction.BYPASS_ATTEMPT && log.details?.toLowerCase().includes('incorrect'));
 
 // Audit Log (Persisted to audit.json, keeps up to 1000 most recent events)
-const AUDIT_FILE = path.join(DOWNLOADS_DIR, 'audit.json');
 const MAX_AUDIT_LOGS = 1000;
 let auditLogs = [];
 
@@ -111,7 +146,7 @@ function getStorageUsage() {
     let totalBytes = 0;
     const details = [];
     for (const file of files) {
-      if (file === 'audit.json' || file.startsWith('.')) continue;
+      if (file.startsWith('.')) continue;
       const fullPath = path.join(DOWNLOADS_DIR, file);
       try {
         const stat = fs.statSync(fullPath);
@@ -190,6 +225,68 @@ function getBinPath(binName) {
 const YTDLP_BIN = getBinPath('yt-dlp');
 const FFMPEG_BIN = getBinPath('ffmpeg');
 
+// Helper: Collect all available cookies files for rotation
+function getAvailableCookieFiles() {
+  const found = new Set();
+
+  const envCookie = process.env.YTDLP_COOKIES_FILE;
+  if (envCookie && fs.existsSync(envCookie)) found.add(path.resolve(envCookie));
+
+  const singleFile = path.join(DATA_DIR, 'cookies.txt');
+  if (fs.existsSync(singleFile)) {
+    try {
+      if (fs.statSync(singleFile).isFile()) found.add(singleFile);
+    } catch (e) {}
+  }
+
+  if (fs.existsSync(COOKIES_DIR)) {
+    try {
+      const entries = fs.readdirSync(COOKIES_DIR);
+      for (const entry of entries) {
+        if (entry.startsWith('.') || !entry.endsWith('.txt')) continue;
+        const fullPath = path.join(COOKIES_DIR, entry);
+        try {
+          if (fs.statSync(fullPath).isFile()) {
+            found.add(fullPath);
+          }
+        } catch (e) {}
+      }
+    } catch (e) {}
+  }
+
+  return Array.from(found);
+}
+
+// Helper: Pick a random cookie file from the available pool
+function getRandomCookieFile() {
+  const pool = getAvailableCookieFiles();
+  if (pool.length === 0) return null;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+// Helper: Common yt-dlp arguments (cookies, optional proxy, optional player client)
+function getYtDlpCommonArgs() {
+  const common = [];
+
+  const cookiePath = getRandomCookieFile();
+  if (cookiePath) {
+    common.push('--cookies', cookiePath);
+  }
+
+  const proxy = process.env.YTDLP_PROXY || process.env.HTTP_PROXY || process.env.HTTPS_PROXY;
+  if (proxy) {
+    common.push('--proxy', proxy);
+  }
+
+  // Only apply player_client if explicitly configured via environment variable
+  // (We do not force android by default, avoiding automatic quality downgrades to 360p)
+  if (process.env.YTDLP_PLAYER_CLIENT) {
+    common.push('--extractor-args', `youtube:player_client=${process.env.YTDLP_PLAYER_CLIENT}`);
+  }
+
+  return common;
+}
+
 // Format seconds into MM:SS or HH:MM:SS
 function formatDuration(seconds) {
   if (!seconds || isNaN(seconds)) return 'Live / Unknown';
@@ -258,7 +355,7 @@ app.get('/api/health', (req, res) => {
 app.post('/api/bypass/verify', (req, res) => {
   const { password } = req.body || {};
   const valid = password === BYPASS_PASSWORD;
-  logAuditEvent('bypass_attempt', {
+  logAuditEvent(AuditAction.BYPASS_ATTEMPT, {
     details: valid ? 'Password bypass verified successfully' : 'Incorrect password entered'
   }, req);
   if (valid) {
@@ -292,15 +389,9 @@ app.get('/api/stats', (req, res) => {
   const filter = (req.query.filter || req.query.status || '').toLowerCase();
   let targetLogs = auditLogs;
   if (filter === 'ok' || filter === 'success') {
-    targetLogs = auditLogs.filter(l => l.action === 'download_completed' || l.action === 'download_cached_hit');
+    targetLogs = auditLogs.filter(isSuccessAuditLog);
   } else if (filter === 'error' || filter === 'errors' || filter === 'fail') {
-    targetLogs = auditLogs.filter(l => 
-      l.action === 'download_error' || 
-      l.action === 'info_error' || 
-      l.action === 'restriction_blocked' ||
-      (l.action === 'bypass_attempt' && l.details?.toLowerCase().includes('incorrect')) ||
-      l.action === 'error'
-    );
+    targetLogs = auditLogs.filter(isErrorAuditLog);
   }
 
   const limit = Math.min(parseInt(req.query.limit, 10) || 50, 1000);
@@ -347,6 +438,7 @@ app.post('/api/info', async (req, res) => {
     '--dump-single-json',
     '--no-warnings',
     '--no-playlist',
+    ...getYtDlpCommonArgs(),
     trimmedUrl
   ];
 
@@ -374,7 +466,7 @@ app.post('/api/info', async (req, res) => {
       } else if (stderr.includes('Unsupported URL')) {
         message = 'URL is not supported or does not contain recognizable media.';
       }
-      logAuditEvent('info_error', { url: trimmedUrl, details: stderr.trim() || message }, req);
+      logAuditEvent(AuditAction.INFO_ERROR, { url: trimmedUrl, details: stderr.trim() || message }, req);
       return res.status(400).json({ error: message, details: stderr.trim() });
     }
 
@@ -452,14 +544,14 @@ app.post('/api/info', async (req, res) => {
         activeJobId
       });
 
-      logAuditEvent('info_fetch', {
+      logAuditEvent(AuditAction.INFO_FETCH, {
         url: trimmedUrl,
         title: data.title,
         duration: data.duration
       }, req);
     } catch (parseErr) {
       console.error('Failed to parse metadata JSON:', parseErr);
-      logAuditEvent('info_error', { url: trimmedUrl, details: 'Failed to parse video metadata JSON' }, req);
+      logAuditEvent(AuditAction.INFO_ERROR, { url: trimmedUrl, details: 'Failed to parse video metadata JSON' }, req);
       res.status(500).json({ error: 'Failed to parse video metadata.' });
     }
   });
@@ -482,7 +574,7 @@ app.post('/api/download/start', (req, res) => {
   const isBypassed = bypassPassword === BYPASS_PASSWORD;
 
   if (isVideo && durationOver1h && !isBypassed) {
-    logAuditEvent('restriction_blocked', {
+    logAuditEvent(AuditAction.RESTRICTION_BLOCKED, {
       url,
       type,
       duration,
@@ -536,7 +628,7 @@ app.post('/api/download/start', (req, res) => {
     });
     console.log(`⚡ Already downloaded file requested, offering immediate save: "${targetFilename}"`);
 
-    logAuditEvent('download_cached_hit', {
+    logAuditEvent(AuditAction.DOWNLOAD_CACHED_HIT, {
       url,
       type,
       quality: qTag,
@@ -560,7 +652,7 @@ app.post('/api/download/start', (req, res) => {
   // 3. Otherwise, start fresh download
   const quota = ensureStorageQuota();
   if (!quota.ok) {
-    logAuditEvent('download_error', { url, details: 'Storage limit reached (2 GB max)' }, req);
+    logAuditEvent(AuditAction.DOWNLOAD_ERROR, { url, details: 'Storage limit reached (2 GB max)' }, req);
     return res.status(507).json({
       error: 'Storage limit reached (2 GB max). Please try again shortly.'
     });
@@ -576,6 +668,7 @@ app.post('/api/download/start', (req, res) => {
     '--progress-template',
     'PROGRESS:%(progress._percent_str)s|%(progress._speed_str)s|%(progress._eta_str)s|%(progress.total_bytes_estimate_str)s',
     '--ffmpeg-location', FFMPEG_BIN,
+    ...getYtDlpCommonArgs(),
     '-o', outputTemplate
   ];
 
@@ -629,14 +722,14 @@ app.post('/api/download/start', (req, res) => {
     createdAt: Date.now()
   };
 
-  logAuditEvent('download_start', {
+  logAuditEvent(AuditAction.DOWNLOAD_START, {
     url,
     type,
     quality: qTag,
     title: safeTitle,
     filename: targetFilename,
     duration,
-    details: isBypassed ? 'Bypass password used' : 'Standard start'
+    details: isBypassed ? 'Bypass password used' : 'Standard download start'
   }, req);
 
   jobs.set(jobId, job);
@@ -689,7 +782,7 @@ app.post('/api/download/start', (req, res) => {
 
     if (job.status === 'cancelled') {
       console.log(`🛑 Download cancelled by user: "${targetFilename}"`);
-      logAuditEvent('download_cancelled', {
+      logAuditEvent(AuditAction.DOWNLOAD_CANCELLED, {
         url: job.url,
         type: job.type,
         quality: job.quality,
@@ -731,7 +824,7 @@ app.post('/api/download/start', (req, res) => {
         fileSize = fs.statSync(targetFilePath).size;
       } catch (e) {}
 
-      logAuditEvent('download_completed', {
+      logAuditEvent(AuditAction.DOWNLOAD_COMPLETED, {
         url: job.url,
         type: job.type,
         quality: job.quality,
@@ -749,7 +842,7 @@ app.post('/api/download/start', (req, res) => {
         job.error = fullStderr.trim() || 'Downloaded file not found on disk.';
       }
 
-      logAuditEvent('download_error', {
+      logAuditEvent(AuditAction.DOWNLOAD_ERROR, {
         url: job.url,
         type: job.type,
         quality: job.quality,
@@ -815,7 +908,7 @@ app.post('/api/download/cancel/:jobId', (req, res) => {
     job.watchdog = null;
   }
 
-  logAuditEvent('download_cancelled', {
+  logAuditEvent(AuditAction.DOWNLOAD_CANCELLED, {
     url: job.url,
     type: job.type,
     quality: job.quality,
@@ -881,7 +974,7 @@ setInterval(() => {
     let purgedCount = 0;
 
     for (const file of files) {
-      if (file === 'audit.json' || file.startsWith('.')) continue;
+      if (file.startsWith('.')) continue;
       const fullPath = path.join(DOWNLOADS_DIR, file);
       const stat = fs.statSync(fullPath);
       if (now - stat.mtimeMs > PURGE_MAX_AGE_MS) {
@@ -914,6 +1007,18 @@ app.listen(PORT, () => {
   console.log(`🌐 Open in browser: http://localhost:${PORT}`);
   console.log(`⚙️  yt-dlp: ${YTDLP_BIN}`);
   console.log(`⚙️  ffmpeg: ${FFMPEG_BIN}`);
+  const cookieFiles = getAvailableCookieFiles();
+  const proxy = process.env.YTDLP_PROXY || process.env.HTTP_PROXY || process.env.HTTPS_PROXY;
+  if (cookieFiles.length > 1) {
+    console.log(`🍪 cookies: ${cookieFiles.length} files loaded (random rotation active)`);
+  } else if (cookieFiles.length === 1) {
+    console.log(`🍪 cookies: 1 file loaded (${path.basename(cookieFiles[0])})`);
+  } else {
+    console.log(`🍪 cookies: None (guest mode)`);
+  }
+  if (proxy) {
+    console.log(`🌐 proxy: ${proxy}`);
+  }
   console.log(`====================================================`);
 });
 

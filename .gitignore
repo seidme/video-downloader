@@ -5,6 +5,7 @@ yarn-debug.log*
 yarn-error.log*
 
 # Downloaded files & temporary storage
+data/
 downloads/
 temp/
 *.mp4
@@ -16,8 +17,11 @@ temp/
 *.ytdl
 
 # Environment & local settings
-.env
 .env.local
+
+# Cookies
+cookies/
+cookies*.txt
 
 # Operating System
 .DS_Store
