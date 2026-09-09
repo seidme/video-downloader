@@ -1,0 +1,16 @@
+services:
+  video-downloader-app:
+    build: .
+    container_name: video-downloader-app
+    restart: always
+    volumes:
+      - ./downloads:/app/downloads
+    # Ports are not exposed externally. Nginx reverse-proxy routes traffic to this container on port 3000.
+    networks:
+      - public-network
+      - default
+
+networks:
+  default:
+  public-network:
+    external: true
