@@ -238,8 +238,11 @@ app.post('/api/info', async (req, res) => {
 
       // Check if download for this URL is currently in progress
       let activeJobId = null;
+      const incomingHash = getUrlHash(trimmedUrl);
       for (const [id, activeJob] of jobs.entries()) {
-        if (activeJob.url === trimmedUrl && (activeJob.status === 'downloading' || activeJob.status === 'processing')) {
+        const jobHash = getUrlHash(activeJob.url);
+        if ((activeJob.url === trimmedUrl || (jobHash && jobHash === incomingHash)) && 
+            (activeJob.status === 'downloading' || activeJob.status === 'processing')) {
           activeJobId = activeJob.jobId;
           break;
         }
@@ -305,8 +308,11 @@ app.post('/api/download/start', (req, res) => {
 
   // 2. Check if a download for this exact URL is ALREADY IN PROGRESS
   const trimmedUrl = url.trim();
+  const incomingHash = getUrlHash(trimmedUrl);
   for (const [id, activeJob] of jobs.entries()) {
-    if (activeJob.url === trimmedUrl && (activeJob.status === 'downloading' || activeJob.status === 'processing')) {
+    const jobHash = getUrlHash(activeJob.url);
+    if ((activeJob.url === trimmedUrl || (jobHash && jobHash === incomingHash)) &&
+        (activeJob.status === 'downloading' || activeJob.status === 'processing')) {
       console.log(`⏳ Download already in progress for: ${trimmedUrl} (attaching to job ${activeJob.jobId})`);
       return res.json({
         jobId: activeJob.jobId,
@@ -476,29 +482,38 @@ app.get('/api/download/file/:jobId', (req, res) => {
   });
 });
 
-// Periodic cleanup of downloads older than 24 hours
+// Periodic cleanup of downloads older than 60 minutes (runs every 5 minutes)
+const PURGE_MAX_AGE_MS = 60 * 60 * 1000; // 60 minutes
+
 setInterval(() => {
   try {
     const now = Date.now();
     const files = fs.readdirSync(DOWNLOADS_DIR);
+    let purgedCount = 0;
+
     for (const file of files) {
       const fullPath = path.join(DOWNLOADS_DIR, file);
       const stat = fs.statSync(fullPath);
-      if (now - stat.mtimeMs > 24 * 60 * 60 * 1000) {
+      if (now - stat.mtimeMs > PURGE_MAX_AGE_MS) {
         fs.unlinkSync(fullPath);
+        purgedCount++;
       }
+    }
+
+    if (purgedCount > 0) {
+      console.log(`🧹 Purged ${purgedCount} download file(s) older than 60 minutes.`);
     }
 
     // Clean old jobs from memory map
     for (const [id, job] of jobs.entries()) {
-      if (now - job.createdAt > 24 * 60 * 60 * 1000) {
+      if (now - job.createdAt > PURGE_MAX_AGE_MS) {
         jobs.delete(id);
       }
     }
   } catch (e) {
     console.error('Cleanup error:', e);
   }
-}, 15 * 60 * 1000);
+}, 5 * 60 * 1000);
 
 app.listen(PORT, () => {
   console.log(`====================================================`);
