@@ -13,6 +13,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Enable CORS and JSON parsing
+app.set('trust proxy', true);
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -28,13 +29,89 @@ if (!fs.existsSync(DOWNLOADS_DIR)) {
   fs.mkdirSync(DOWNLOADS_DIR, { recursive: true });
 }
 
-// Helper: Calculate total storage currently used by downloads folder
+// Audit Log (Persisted to audit.json, keeps up to 1000 most recent events)
+const AUDIT_FILE = path.join(DOWNLOADS_DIR, 'audit.json');
+const MAX_AUDIT_LOGS = 1000;
+let auditLogs = [];
+
+try {
+  if (fs.existsSync(AUDIT_FILE)) {
+    const raw = fs.readFileSync(AUDIT_FILE, 'utf-8');
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      auditLogs = parsed.slice(0, MAX_AUDIT_LOGS);
+    }
+  }
+} catch (err) {
+  console.error('Failed to initialize audit.json:', err.message);
+  auditLogs = [];
+}
+
+let saveAuditTimer = null;
+function scheduleSaveAudit() {
+  if (saveAuditTimer) return;
+  saveAuditTimer = setTimeout(() => {
+    saveAuditTimer = null;
+    try {
+      fs.writeFileSync(AUDIT_FILE, JSON.stringify(auditLogs, null, 2), 'utf-8');
+    } catch (err) {
+      console.error('Failed to save audit.json:', err.message);
+    }
+  }, 500);
+}
+
+function getClientIp(req) {
+  if (!req) return 'unknown';
+  if (req.ipContext) return req.ipContext;
+  const forwarded = req.headers ? req.headers['x-forwarded-for'] : null;
+  if (forwarded) {
+    return forwarded.split(',')[0].trim();
+  }
+  return req.ip || req.socket?.remoteAddress || 'unknown';
+}
+
+function formatBytes(bytes) {
+  if (!bytes || bytes === 0 || isNaN(bytes)) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+function logAuditEvent(action, data = {}, req = null) {
+  const entry = {
+    id: crypto.randomUUID(),
+    timestamp: new Date().toISOString(),
+    action,
+    ip: getClientIp(req),
+    url: data.url || null,
+    type: data.type || null,
+    quality: data.quality || null,
+    title: data.title || null,
+    filename: data.filename || null,
+    fileSize: data.fileSize || null,
+    fileSizeFormatted: data.fileSizeFormatted || (data.fileSize ? formatBytes(data.fileSize) : null),
+    duration: data.duration || null,
+    cached: data.cached || false,
+    details: data.details || null
+  };
+
+  auditLogs.unshift(entry);
+  if (auditLogs.length > MAX_AUDIT_LOGS) {
+    auditLogs = auditLogs.slice(0, MAX_AUDIT_LOGS);
+  }
+  scheduleSaveAudit();
+  return entry;
+}
+
+// Helper: Calculate total storage currently used by downloads folder (excludes audit.json)
 function getStorageUsage() {
   try {
     const files = fs.readdirSync(DOWNLOADS_DIR);
     let totalBytes = 0;
     const details = [];
     for (const file of files) {
+      if (file === 'audit.json' || file.startsWith('.')) continue;
       const fullPath = path.join(DOWNLOADS_DIR, file);
       try {
         const stat = fs.statSync(fullPath);
@@ -180,10 +257,65 @@ app.get('/api/health', (req, res) => {
 // POST /api/bypass/verify - Verify bypass password on backend
 app.post('/api/bypass/verify', (req, res) => {
   const { password } = req.body || {};
-  if (password === BYPASS_PASSWORD) {
+  const valid = password === BYPASS_PASSWORD;
+  logAuditEvent('bypass_attempt', {
+    details: valid ? 'Password bypass verified successfully' : 'Incorrect password entered'
+  }, req);
+  if (valid) {
     return res.json({ valid: true, message: 'Password verified.' });
   }
   return res.status(401).json({ valid: false, error: 'Incorrect password. Hint: slija' });
+});
+
+// GET /api/stats - Server health, history file counts, sizes, biggest file, and audit logs
+app.get('/api/stats', (req, res) => {
+  const { totalBytes, details } = getStorageUsage();
+
+  // Find biggest file
+  let biggestFile = null;
+  if (details.length > 0) {
+    const sorted = [...details].sort((a, b) => b.size - a.size);
+    biggestFile = {
+      filename: sorted[0].file,
+      sizeBytes: sorted[0].size,
+      sizeFormatted: formatBytes(sorted[0].size)
+    };
+  }
+
+  const filesList = details.map(d => ({
+    filename: d.file,
+    sizeBytes: d.size,
+    sizeFormatted: formatBytes(d.size),
+    mtimeMs: d.mtimeMs
+  })).sort((a, b) => b.mtimeMs - a.mtimeMs);
+
+  const limit = Math.min(parseInt(req.query.limit, 10) || 50, 1000);
+
+  res.json({
+    status: 'online',
+    timestamp: new Date().toISOString(),
+    history: {
+      fileCount: details.length,
+      totalBytes,
+      totalFormatted: formatBytes(totalBytes),
+      biggestFile,
+      files: filesList
+    },
+    storage: {
+      usedBytes: totalBytes,
+      usedMB: (totalBytes / (1024 * 1024)).toFixed(2),
+      maxBytes: MAX_STORAGE_BYTES,
+      maxGB: (MAX_STORAGE_BYTES / (1024 * 1024 * 1024)).toFixed(1),
+      purgeThresholdBytes: PURGE_THRESHOLD_BYTES,
+      purgeThresholdMB: (PURGE_THRESHOLD_BYTES / (1024 * 1024)).toFixed(0),
+      usagePercent: ((totalBytes / MAX_STORAGE_BYTES) * 100).toFixed(1)
+    },
+    activeJobs: jobs.size,
+    audit: {
+      totalCount: auditLogs.length,
+      recentLogs: auditLogs.slice(0, limit)
+    }
+  });
 });
 
 // POST /api/info - Fetch metadata for any video URL
@@ -227,6 +359,7 @@ app.post('/api/info', async (req, res) => {
       } else if (stderr.includes('Unsupported URL')) {
         message = 'URL is not supported or does not contain recognizable media.';
       }
+      logAuditEvent('info_error', { url: trimmedUrl, details: stderr.trim() || message }, req);
       return res.status(400).json({ error: message, details: stderr.trim() });
     }
 
@@ -303,8 +436,15 @@ app.post('/api/info', async (req, res) => {
         isDownloading: !!activeJobId,
         activeJobId
       });
+
+      logAuditEvent('info_fetch', {
+        url: trimmedUrl,
+        title: data.title,
+        duration: data.duration
+      }, req);
     } catch (parseErr) {
       console.error('Failed to parse metadata JSON:', parseErr);
+      logAuditEvent('info_error', { url: trimmedUrl, details: 'Failed to parse video metadata JSON' }, req);
       res.status(500).json({ error: 'Failed to parse video metadata.' });
     }
   });
@@ -327,6 +467,13 @@ app.post('/api/download/start', (req, res) => {
   const isBypassed = bypassPassword === BYPASS_PASSWORD;
 
   if (isVideo && durationOver1h && !isBypassed) {
+    logAuditEvent('restriction_blocked', {
+      url,
+      type,
+      duration,
+      title: safeTitle,
+      details: 'Video exceeds 1 hour limit without password'
+    }, req);
     return res.status(403).json({
       error: 'Videos longer than 1 hour require bypass password (Hint: slija).',
       restricted: true,
@@ -357,6 +504,11 @@ app.post('/api/download/start', (req, res) => {
   // 2. If finished file already exists on disk, offer to save immediately!
   if (fs.existsSync(targetFilePath)) {
     const existingJobId = crypto.randomUUID();
+    let fileSize = 0;
+    try {
+      fileSize = fs.statSync(targetFilePath).size;
+    } catch (e) {}
+
     jobs.set(existingJobId, {
       jobId: existingJobId,
       url,
@@ -368,6 +520,18 @@ app.post('/api/download/start', (req, res) => {
       percent: 100
     });
     console.log(`⚡ Already downloaded file requested, offering immediate save: "${targetFilename}"`);
+
+    logAuditEvent('download_cached_hit', {
+      url,
+      type,
+      quality: qTag,
+      title: safeTitle,
+      filename: targetFilename,
+      fileSize,
+      fileSizeFormatted: formatBytes(fileSize),
+      cached: true
+    }, req);
+
     return res.json({
       jobId: existingJobId,
       cached: true,
@@ -381,6 +545,7 @@ app.post('/api/download/start', (req, res) => {
   // 3. Otherwise, start fresh download
   const quota = ensureStorageQuota();
   if (!quota.ok) {
+    logAuditEvent('download_error', { url, details: 'Storage limit reached (2 GB max)' }, req);
     return res.status(507).json({
       error: 'Storage limit reached (2 GB max). Please try again shortly.'
     });
@@ -426,9 +591,12 @@ app.post('/api/download/start', (req, res) => {
 
   args.push(url.trim());
 
+  const clientIp = getClientIp(req);
+
   const job = {
     jobId,
     url,
+    clientIp,
     targetFilePath,
     targetFilename,
     type,
@@ -445,6 +613,16 @@ app.post('/api/download/start', (req, res) => {
     error: null,
     createdAt: Date.now()
   };
+
+  logAuditEvent('download_start', {
+    url,
+    type,
+    quality: qTag,
+    title: safeTitle,
+    filename: targetFilename,
+    duration,
+    details: isBypassed ? 'Bypass password used' : 'Standard start'
+  }, req);
 
   jobs.set(jobId, job);
 
@@ -496,6 +674,14 @@ app.post('/api/download/start', (req, res) => {
 
     if (job.status === 'cancelled') {
       console.log(`🛑 Download cancelled by user: "${targetFilename}"`);
+      logAuditEvent('download_cancelled', {
+        url: job.url,
+        type: job.type,
+        quality: job.quality,
+        title: job.safeTitle,
+        filename: targetFilename
+      }, { ipContext: job.clientIp });
+
       // Clean up partial/temporary files for this exact file
       try {
         if (fs.existsSync(targetFilePath)) fs.unlinkSync(targetFilePath);
@@ -524,6 +710,22 @@ app.post('/api/download/start', (req, res) => {
       job.status = 'completed';
       job.percent = 100;
       console.log(`✅ Download complete: "${targetFilename}"`);
+
+      let fileSize = 0;
+      try {
+        fileSize = fs.statSync(targetFilePath).size;
+      } catch (e) {}
+
+      logAuditEvent('download_completed', {
+        url: job.url,
+        type: job.type,
+        quality: job.quality,
+        title: job.safeTitle,
+        filename: targetFilename,
+        fileSize,
+        fileSizeFormatted: formatBytes(fileSize),
+        cached: false
+      }, { ipContext: job.clientIp });
     } else {
       job.status = 'error';
       if (fullStderr.includes('larger than max-filesize') || fullStderr.includes('max-filesize')) {
@@ -531,6 +733,15 @@ app.post('/api/download/start', (req, res) => {
       } else {
         job.error = fullStderr.trim() || 'Downloaded file not found on disk.';
       }
+
+      logAuditEvent('download_error', {
+        url: job.url,
+        type: job.type,
+        quality: job.quality,
+        title: job.safeTitle,
+        filename: targetFilename,
+        details: job.error
+      }, { ipContext: job.clientIp });
     }
   });
 
@@ -589,6 +800,15 @@ app.post('/api/download/cancel/:jobId', (req, res) => {
     job.watchdog = null;
   }
 
+  logAuditEvent('download_cancelled', {
+    url: job.url,
+    type: job.type,
+    quality: job.quality,
+    title: job.safeTitle,
+    filename: job.targetFilename,
+    jobId
+  }, req);
+
   if (job.process) {
     job.process.kill();
     job.process = null;
@@ -646,6 +866,7 @@ setInterval(() => {
     let purgedCount = 0;
 
     for (const file of files) {
+      if (file === 'audit.json' || file.startsWith('.')) continue;
       const fullPath = path.join(DOWNLOADS_DIR, file);
       const stat = fs.statSync(fullPath);
       if (now - stat.mtimeMs > PURGE_MAX_AGE_MS) {

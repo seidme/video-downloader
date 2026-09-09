@@ -821,6 +821,44 @@ body {
   color: var(--text-dim);
 }
 
+.footer-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn-server-stats {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-server-stats:hover {
+  background: rgba(99, 102, 241, 0.12);
+  border-color: rgba(99, 102, 241, 0.4);
+  color: #c7d2fe;
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.2);
+}
+
+.btn-server-stats svg {
+  color: #38bdf8;
+  transition: transform 0.2s ease;
+}
+
+.btn-server-stats:hover svg {
+  transform: scale(1.1);
+}
+
 .footer code {
   color: var(--text-muted);
   background: rgba(255, 255, 255, 0.05);
