@@ -17,9 +17,9 @@ jobs:
     - name: Deploy with Docker Compose
       uses: appleboy/ssh-action@v1.2.2
       with:
-        host: ${{ secrets.SSH_HOST || secrets.SERVER_HOST || '159.65.123.140' }}
-        username: ${{ secrets.SSH_USERNAME || secrets.SERVER_USERNAME || 'seidme' }}
-        key: ${{ secrets.SSH_PRIVATE_KEY || secrets.SSH_KEY || secrets.SERVER_KEY }}
+        host: "159.65.123.140"
+        username: "seidme"
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
         script: |
             # Navigate to the directory where your project is on the server
             cd /var/www/video-downloader 
