@@ -81,14 +81,14 @@ function loadDownloads() {
     if (fs.existsSync(REGISTRY_FILE)) {
       return JSON.parse(fs.readFileSync(REGISTRY_FILE, 'utf-8'));
     }
-  } catch (e) {}
+  } catch (e) { }
   return {};
 }
 
 function saveDownloads(data) {
   try {
     fs.writeFileSync(REGISTRY_FILE, JSON.stringify(data, null, 2));
-  } catch (e) {}
+  } catch (e) { }
 }
 
 function getExistingDownload(url) {
@@ -168,7 +168,7 @@ app.post('/api/info', async (req, res) => {
 
     try {
       const data = JSON.parse(stdout);
-      
+
       // Determine platform
       let platform = data.extractor_key || data.extractor || 'Web Video';
       if (/youtube/i.test(platform)) platform = 'YouTube';
@@ -208,9 +208,6 @@ app.post('/api/info', async (req, res) => {
         { id: 'm4a', label: 'M4A - AAC Audio', ext: 'm4a' }
       ];
 
-      // Check if this exact URL was already downloaded
-      const existing = getExistingDownload(trimmedUrl);
-
       // Check if download for this URL is currently in progress
       let activeJobId = null;
       for (const [id, activeJob] of jobs.entries()) {
@@ -219,6 +216,9 @@ app.post('/api/info', async (req, res) => {
           break;
         }
       }
+
+      // Check if this exact URL was already downloaded
+      const existing = getExistingDownload(trimmedUrl);
 
       res.json({
         id: data.id,
@@ -289,20 +289,23 @@ app.post('/api/download/start', (req, res) => {
     });
   }
 
-  // 2. Check if a download for this exact URL is ALREADY IN PROGRESS
+  // 2. Check if a download for this exact URL is ALREADY IN PROGRESS OR QUEUED
   const trimmedUrl = url.trim();
   for (const [id, activeJob] of jobs.entries()) {
-    if (activeJob.url === trimmedUrl && (activeJob.status === 'downloading' || activeJob.status === 'processing')) {
-      console.log(`⏳ Download already in progress for: ${trimmedUrl} (attaching to job ${activeJob.jobId})`);
+    if (activeJob.url === trimmedUrl && (activeJob.status === 'downloading' || activeJob.status === 'processing' || activeJob.status === 'queued')) {
+      const queuePos = activeJob.status === 'queued' ? (downloadQueue.findIndex(j => j.jobId === activeJob.jobId) + 1) : null;
+      console.log(`⏳ Download already active/queued for: ${trimmedUrl} (attaching to job ${activeJob.jobId})`);
       return res.json({
         jobId: activeJob.jobId,
         inProgress: true,
-        message: 'Download is already in progress, attaching to current job.'
+        queued: activeJob.status === 'queued',
+        queuePosition: queuePos,
+        message: activeJob.status === 'queued' ? `Download queued at #${queuePos}.` : 'Download is already in progress, attaching to current job.'
       });
     }
   }
 
-  // 3. Otherwise, start fresh download
+  // 3. Otherwise, prepare download job
   const jobId = crypto.randomUUID();
   const safeTitle = sanitizeFilename(title);
   const ext = type === 'audio' ? (quality === 'm4a' ? 'm4a' : 'mp3') : 'mp4';
@@ -347,12 +350,12 @@ app.post('/api/download/start', (req, res) => {
 
   const job = {
     jobId,
-    url,
+    url: trimmedUrl,
     type,
     quality,
     safeTitle,
     targetExt: ext,
-    status: 'downloading',
+    status: 'queued',
     percent: 0,
     speed: '0 KiB/s',
     eta: '--:--',
@@ -360,13 +363,64 @@ app.post('/api/download/start', (req, res) => {
     filePath: null,
     downloadFilename: `${safeTitle}.${ext}`,
     error: null,
-    createdAt: Date.now()
+    createdAt: Date.now(),
+    args
   };
 
   jobs.set(jobId, job);
 
+  // Check concurrency limit: Up to 3 simultaneous downloads
+  if (getActiveDownloadCount() < MAX_CONCURRENT_DOWNLOADS) {
+    startJobExecution(job);
+    res.json({
+      jobId,
+      inProgress: true,
+      activeSlot: true,
+      activeCount: getActiveDownloadCount()
+    });
+  } else {
+    downloadQueue.push(job);
+    const queuePosition = downloadQueue.length;
+    console.log(`📥 Concurrent limit (3) reached. Queued ${trimmedUrl} at position #${queuePosition}`);
+    res.json({
+      jobId,
+      queued: true,
+      queuePosition,
+      activeCount: getActiveDownloadCount(),
+      message: `3 downloads already active. Queued at position #${queuePosition}.`
+    });
+  }
+});
+
+// Concurrency Control (Max 3 simultaneous downloads of different URLs)
+const MAX_CONCURRENT_DOWNLOADS = 3;
+const downloadQueue = [];
+
+function getActiveDownloadCount() {
+  let count = 0;
+  for (const [id, job] of jobs.entries()) {
+    if (job.status === 'downloading' || job.status === 'processing') {
+      count++;
+    }
+  }
+  return count;
+}
+
+function processQueue() {
+  while (downloadQueue.length > 0 && getActiveDownloadCount() < MAX_CONCURRENT_DOWNLOADS) {
+    const nextJob = downloadQueue.shift();
+    if (nextJob && nextJob.status === 'queued') {
+      startJobExecution(nextJob);
+    }
+  }
+}
+
+function startJobExecution(job) {
+  job.status = 'downloading';
+  console.log(`▶️ Starting download job: ${job.jobId} for "${job.safeTitle}" (Active: ${getActiveDownloadCount()}/${MAX_CONCURRENT_DOWNLOADS})`);
+
   const env = { ...process.env, PATH: `/opt/homebrew/bin:/usr/local/bin:${process.env.PATH}` };
-  const child = spawn(YTDLP_BIN, args, { env });
+  const child = spawn(YTDLP_BIN, job.args, { env });
   job.process = child;
 
   let fullStderr = '';
@@ -399,19 +453,19 @@ app.post('/api/download/start', (req, res) => {
     if (code === 0) {
       // Find output file
       const files = fs.readdirSync(DOWNLOADS_DIR);
-      const match = files.find(f => f.startsWith(jobId));
+      const match = files.find(f => f.startsWith(job.jobId));
       if (match) {
         job.filePath = path.join(DOWNLOADS_DIR, match);
-        const actualExt = path.extname(match).replace('.', '') || ext;
-        job.downloadFilename = `${safeTitle}.${actualExt}`;
+        const actualExt = path.extname(match).replace('.', '') || job.targetExt;
+        job.downloadFilename = `${job.safeTitle}.${actualExt}`;
         job.status = 'completed';
         job.percent = 100;
 
         // Save URL record so user can save again without re-downloading
-        recordDownload(url, {
-          jobId,
-          url: url.trim(),
-          safeTitle,
+        recordDownload(job.url, {
+          jobId: job.jobId,
+          url: job.url.trim(),
+          safeTitle: job.safeTitle,
           downloadFilename: job.downloadFilename,
           filePath: job.filePath,
           downloadedAt: Date.now()
@@ -424,15 +478,17 @@ app.post('/api/download/start', (req, res) => {
       job.status = 'error';
       job.error = fullStderr.trim() || 'Failed to download stream.';
     }
+
+    // Process next queued download
+    processQueue();
   });
 
   child.on('error', err => {
     job.status = 'error';
     job.error = err.message;
+    processQueue();
   });
-
-  res.json({ jobId });
-});
+}
 
 // GET /api/download/progress/:jobId - Poll status of download
 app.get('/api/download/progress/:jobId', (req, res) => {
@@ -441,6 +497,8 @@ app.get('/api/download/progress/:jobId', (req, res) => {
   if (!job) {
     return res.status(404).json({ error: 'Download job not found.' });
   }
+
+  const queuePos = job.status === 'queued' ? (downloadQueue.findIndex(j => j.jobId === jobId) + 1) : null;
 
   res.json({
     jobId: job.jobId,
@@ -451,7 +509,10 @@ app.get('/api/download/progress/:jobId', (req, res) => {
     totalSize: job.totalSize,
     downloadFilename: job.downloadFilename,
     error: job.error,
-    fileReady: job.status === 'completed'
+    fileReady: job.status === 'completed',
+    queued: job.status === 'queued',
+    queuePosition: queuePos,
+    activeCount: getActiveDownloadCount()
   });
 });
 
