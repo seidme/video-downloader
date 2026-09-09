@@ -19,7 +19,7 @@ jobs:
       with:
         host: "159.65.123.140"
         username: "seidme"
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}${{ secrets.SSH_KEY }}
         script: |
             # Navigate to the directory where your project is on the server
             cd /var/www/video-downloader 
