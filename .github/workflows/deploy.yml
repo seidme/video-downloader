@@ -28,4 +28,4 @@ jobs:
             git pull --ff-only
 
             # Rebuild and restart the Docker services
-            sudo docker compose up --build -d
+            docker compose up --build -d
