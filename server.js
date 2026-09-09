@@ -396,10 +396,10 @@ app.post('/api/download/start', (req, res) => {
 
   child.on('close', code => {
     if (code === 0) {
-      // Find output file by exact tag or hash
+      // Find output file by exact [quality] [hash] tag
       const files = fs.readdirSync(DOWNLOADS_DIR);
       const expectedTag = `[${qTag}] [${urlHash}].`;
-      const match = files.find(f => f.includes(expectedTag)) || files.find(f => f.includes(`[${urlHash}].`));
+      const match = files.find(f => f.includes(expectedTag));
       if (match) {
         job.filePath = path.join(DOWNLOADS_DIR, match);
         job.downloadFilename = match; // Exact filename on disk, no stripping needed
