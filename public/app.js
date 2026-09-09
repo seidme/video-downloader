@@ -152,14 +152,9 @@ function renderMediaPreview(media) {
   resultCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-function isQualityCached(type, qualityId) {
-  if (!currentMedia || !Array.isArray(currentMedia.cachedDownloads)) return false;
-  return currentMedia.cachedDownloads.some(c => c.type === type && c.quality === qualityId);
-}
-
 function updateDownloadButtonText() {
-  if (isQualityCached(currentMode, selectedQuality)) {
-    downloadBtnText.textContent = '⚡ Save Existing File (Instant)';
+  if (currentMedia && currentMedia.alreadyDownloaded) {
+    downloadBtnText.textContent = '💾 Save File (Already Downloaded)';
   } else {
     downloadBtnText.textContent = currentMode === 'video' ? 'Download Video (MP4)' : 'Download Audio (MP3)';
   }
@@ -197,9 +192,7 @@ function renderQualityChips(qualities) {
     const chip = document.createElement('button');
     chip.type = 'button';
     chip.className = `quality-chip ${index === 0 ? 'selected' : ''}`;
-    
-    const isCached = isQualityCached(currentMode, q.id);
-    chip.innerHTML = `${q.label}${isCached ? ' <span style="color: #10b981; font-weight: 700; margin-left: 4px;">⚡ Saved</span>' : ''}`;
+    chip.textContent = q.label;
     chip.dataset.id = q.id;
 
     chip.addEventListener('click', () => {
