@@ -235,12 +235,27 @@ app.post('/api/download/start', (req, res) => {
   const targetFilename = `${safeTitle} [${qTag}] [${urlHash}].${ext}`;
   const targetFilePath = path.join(DOWNLOADS_DIR, targetFilename);
 
-  // 1. If user already downloaded this exact file, offer to save immediately!
+  // 1. Check if a download for this exact file is ALREADY IN PROGRESS
+  for (const [id, activeJob] of jobs.entries()) {
+    if (activeJob.targetFilePath === targetFilePath &&
+        (activeJob.status === 'downloading' || activeJob.status === 'processing')) {
+      console.log(`⏳ Download already in progress for: "${targetFilename}" (attaching to job ${activeJob.jobId})`);
+      return res.json({
+        jobId: activeJob.jobId,
+        inProgress: true,
+        message: 'Download is already in progress, attaching to current job.'
+      });
+    }
+  }
+
+  // 2. If finished file already exists on disk, offer to save immediately!
   if (fs.existsSync(targetFilePath)) {
     const existingJobId = crypto.randomUUID();
     jobs.set(existingJobId, {
       jobId: existingJobId,
       url,
+      targetFilePath,
+      targetFilename,
       filePath: targetFilePath,
       downloadFilename: targetFilename,
       status: 'completed',
@@ -255,22 +270,6 @@ app.post('/api/download/start', (req, res) => {
       downloadUrl: `/api/download/file/${existingJobId}`,
       message: 'File already downloaded! Ready to save.'
     });
-  }
-
-  // 2. Check if a download for this exact URL is ALREADY IN PROGRESS
-  const trimmedUrl = url.trim();
-  const incomingHash = getUrlHash(trimmedUrl);
-  for (const [id, activeJob] of jobs.entries()) {
-    const jobHash = getUrlHash(activeJob.url);
-    if ((activeJob.url === trimmedUrl || (jobHash && jobHash === incomingHash)) &&
-        (activeJob.status === 'downloading' || activeJob.status === 'processing')) {
-      console.log(`⏳ Download already in progress for: ${trimmedUrl} (attaching to job ${activeJob.jobId})`);
-      return res.json({
-        jobId: activeJob.jobId,
-        inProgress: true,
-        message: 'Download is already in progress, attaching to current job.'
-      });
-    }
   }
 
   // 3. Otherwise, start fresh download
@@ -312,8 +311,10 @@ app.post('/api/download/start', (req, res) => {
   const job = {
     jobId,
     url,
+    targetFilePath,
+    targetFilename,
     type,
-    quality,
+    quality: qTag,
     safeTitle,
     targetExt: ext,
     status: 'downloading',
@@ -322,7 +323,7 @@ app.post('/api/download/start', (req, res) => {
     eta: '--:--',
     totalSize: 'Calculating...',
     filePath: null,
-    downloadFilename: `${safeTitle}.${ext}`,
+    downloadFilename: targetFilename,
     error: null,
     createdAt: Date.now()
   };
