@@ -17,10 +17,75 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Downloads directory
+// Downloads directory & Storage Limit (2 GB max)
 const DOWNLOADS_DIR = path.join(__dirname, 'downloads');
+const MAX_STORAGE_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB
+
 if (!fs.existsSync(DOWNLOADS_DIR)) {
   fs.mkdirSync(DOWNLOADS_DIR, { recursive: true });
+}
+
+// Helper: Calculate total storage currently used by downloads folder
+function getStorageUsage() {
+  try {
+    const files = fs.readdirSync(DOWNLOADS_DIR);
+    let totalBytes = 0;
+    const details = [];
+    for (const file of files) {
+      const fullPath = path.join(DOWNLOADS_DIR, file);
+      try {
+        const stat = fs.statSync(fullPath);
+        if (stat.isFile()) {
+          totalBytes += stat.size;
+          details.push({ file, fullPath, size: stat.size, mtimeMs: stat.mtimeMs });
+        }
+      } catch (statErr) {}
+    }
+    return { totalBytes, details };
+  } catch (err) {
+    return { totalBytes: 0, details: [] };
+  }
+}
+
+// Helper: Enforce 2 GB volume limit by purging oldest files if needed
+function ensureStorageQuota(headroomBytes = 50 * 1024 * 1024) {
+  try {
+    let { totalBytes, details } = getStorageUsage();
+    if (totalBytes + headroomBytes <= MAX_STORAGE_BYTES) {
+      return { ok: true, totalBytes };
+    }
+
+    // Sort files by mtime ascending (oldest first)
+    details.sort((a, b) => a.mtimeMs - b.mtimeMs);
+
+    // Active jobs file set to prevent deleting active downloads
+    const activePaths = new Set();
+    for (const job of jobs.values()) {
+      if (job.targetFilePath) activePaths.add(job.targetFilePath);
+      if (job.filePath) activePaths.add(job.filePath);
+    }
+
+    let purgedBytes = 0;
+    for (const item of details) {
+      if (totalBytes + headroomBytes <= MAX_STORAGE_BYTES) break;
+      if (activePaths.has(item.fullPath)) continue;
+
+      try {
+        fs.unlinkSync(item.fullPath);
+        totalBytes -= item.size;
+        purgedBytes += item.size;
+        console.log(`🧹 Storage quota: purged oldest file "${item.file}" (${(item.size / (1024 * 1024)).toFixed(1)} MB)`);
+      } catch (delErr) {
+        console.error(`Failed to delete ${item.file}:`, delErr);
+      }
+    }
+
+    const ok = (totalBytes + headroomBytes) <= MAX_STORAGE_BYTES;
+    return { ok, totalBytes, purgedBytes };
+  } catch (err) {
+    console.error('Storage quota check error:', err);
+    return { ok: true, totalBytes: 0, purgedBytes: 0 };
+  }
 }
 
 // Active download jobs in-memory store
@@ -81,17 +146,25 @@ function getUrlHash(url) {
 
 
 
-// GET /api/health - Check engine status
+// GET /api/health - Check engine status & storage health
 app.get('/api/health', (req, res) => {
   const ytProc = spawn(YTDLP_BIN, ['--version']);
   let ytVer = '';
   ytProc.stdout.on('data', d => ytVer += d.toString());
   ytProc.on('close', code => {
+    const { totalBytes } = getStorageUsage();
     res.json({
       status: code === 0 ? 'online' : 'error',
       ytdlp: code === 0 ? ytVer.trim() : 'missing',
       ffmpegLocation: FFMPEG_BIN,
-      activeJobs: jobs.size
+      activeJobs: jobs.size,
+      storage: {
+        usedBytes: totalBytes,
+        usedMB: (totalBytes / (1024 * 1024)).toFixed(2),
+        maxBytes: MAX_STORAGE_BYTES,
+        maxGB: (MAX_STORAGE_BYTES / (1024 * 1024 * 1024)).toFixed(1),
+        usagePercent: ((totalBytes / MAX_STORAGE_BYTES) * 100).toFixed(1)
+      }
     });
   });
   ytProc.on('error', err => {
@@ -278,6 +351,13 @@ app.post('/api/download/start', (req, res) => {
   }
 
   // 3. Otherwise, start fresh download
+  const quota = ensureStorageQuota();
+  if (!quota.ok) {
+    return res.status(507).json({
+      error: 'Storage limit reached (2 GB max). Please try again shortly.'
+    });
+  }
+
   const jobId = crypto.randomUUID();
   const outputTemplate = path.join(DOWNLOADS_DIR, `${safeTitle} [${qTag}] [${urlHash}].%(ext)s`);
 
@@ -547,6 +627,9 @@ setInterval(() => {
         jobs.delete(id);
       }
     }
+
+    // Enforce 2 GB volume quota if needed
+    ensureStorageQuota(0);
   } catch (e) {
     console.error('Cleanup error:', e);
   }
