@@ -73,44 +73,67 @@ function sanitizeFilename(name) {
     .substring(0, 150);
 }
 
-// Simple Record of Downloaded URLs
-const REGISTRY_FILE = path.join(DOWNLOADS_DIR, 'downloaded-urls.json');
-
-function loadDownloads() {
-  try {
-    if (fs.existsSync(REGISTRY_FILE)) {
-      return JSON.parse(fs.readFileSync(REGISTRY_FILE, 'utf-8'));
-    }
-  } catch (e) { }
-  return {};
+// URL Hash in filename helper: appends a compact 8-char hash to the filename on disk
+function getUrlHash(url) {
+  if (!url) return '';
+  return crypto.createHash('md5').update(url.trim()).digest('hex').substring(0, 8);
 }
 
-function saveDownloads(data) {
-  try {
-    fs.writeFileSync(REGISTRY_FILE, JSON.stringify(data, null, 2));
-  } catch (e) { }
-}
-
-function getExistingDownload(url) {
+function getExistingDownload(url, type = null) {
   if (!url) return null;
-  const data = loadDownloads();
-  const entry = data[url.trim()];
-  if (entry) {
-    if (entry.filePath && fs.existsSync(entry.filePath)) {
-      return entry;
-    }
-    // File was purged or deleted: prune stale record immediately
-    delete data[url.trim()];
-    saveDownloads(data);
-  }
-  return null;
-}
+  const hash = getUrlHash(url);
+  const token = `__[${hash}].`;
 
-function recordDownload(url, entry) {
-  if (!url) return;
-  const data = loadDownloads();
-  data[url.trim()] = entry;
-  saveDownloads(data);
+  try {
+    const files = fs.readdirSync(DOWNLOADS_DIR);
+    let match = null;
+    if (type === 'audio') {
+      match = files.find(f => f.includes(token) && (f.endsWith('.mp3') || f.endsWith('.m4a') || f.endsWith('.wav')));
+    } else if (type === 'video') {
+      match = files.find(f => f.includes(token) && (f.endsWith('.mp4') || f.endsWith('.webm') || f.endsWith('.mkv')));
+    } else {
+      match = files.find(f => f.includes(token));
+    }
+
+    if (!match) return null;
+
+    const filePath = path.join(DOWNLOADS_DIR, match);
+    const cleanFilename = match.replace(token, '.');
+
+    // Reuse existing in-memory job or create a transient one
+    let existingJobId = null;
+    for (const [id, job] of jobs.entries()) {
+      if (job.filePath === filePath) {
+        existingJobId = id;
+        break;
+      }
+    }
+
+    if (!existingJobId) {
+      existingJobId = crypto.randomUUID();
+      jobs.set(existingJobId, {
+        jobId: existingJobId,
+        url: url.trim(),
+        safeTitle: cleanFilename.substring(0, cleanFilename.lastIndexOf('.')) || 'media',
+        filePath,
+        downloadFilename: cleanFilename,
+        status: 'completed',
+        percent: 100,
+        fileReady: true,
+        cached: true,
+        createdAt: Date.now()
+      });
+    }
+
+    return {
+      jobId: existingJobId,
+      url: url.trim(),
+      filePath,
+      downloadFilename: cleanFilename
+    };
+  } catch (e) {
+    return null;
+  }
 }
 
 // GET /api/health - Check engine status
@@ -267,29 +290,15 @@ app.post('/api/download/start', (req, res) => {
   }
 
   // If user already downloaded this URL, don't download again - just offer to save!
-  const existing = getExistingDownload(url);
+  const existing = getExistingDownload(url, type);
   if (existing) {
-    const existingJobId = existing.jobId || crypto.randomUUID();
-    jobs.set(existingJobId, {
-      jobId: existingJobId,
-      url: existing.url,
-      safeTitle: existing.safeTitle,
-      filePath: existing.filePath,
-      downloadFilename: existing.downloadFilename,
-      status: 'completed',
-      percent: 100,
-      fileReady: true,
-      cached: true,
-      createdAt: Date.now()
-    });
-
     console.log(`⚡ Already downloaded URL requested, offering immediate save: "${existing.downloadFilename}"`);
     return res.json({
-      jobId: existingJobId,
+      jobId: existing.jobId,
       cached: true,
       fileReady: true,
       downloadFilename: existing.downloadFilename,
-      downloadUrl: `/api/download/file/${existingJobId}`,
+      downloadUrl: `/api/download/file/${existing.jobId}`,
       message: 'Video already downloaded! Ready to save.'
     });
   }
@@ -311,7 +320,8 @@ app.post('/api/download/start', (req, res) => {
   const jobId = crypto.randomUUID();
   const safeTitle = sanitizeFilename(title);
   const ext = type === 'audio' ? (quality === 'm4a' ? 'm4a' : 'mp3') : 'mp4';
-  const outputTemplate = path.join(DOWNLOADS_DIR, `${jobId}.%(ext)s`);
+  const urlHash = getUrlHash(url);
+  const outputTemplate = path.join(DOWNLOADS_DIR, `${safeTitle}__[${urlHash}].%(ext)s`);
 
   // Build yt-dlp arguments
   const args = [
@@ -402,25 +412,16 @@ app.post('/api/download/start', (req, res) => {
 
   child.on('close', code => {
     if (code === 0) {
-      // Find output file
+      // Find output file by urlHash token
       const files = fs.readdirSync(DOWNLOADS_DIR);
-      const match = files.find(f => f.startsWith(jobId));
+      const hashToken = `__[${urlHash}].`;
+      const match = files.find(f => f.includes(hashToken));
       if (match) {
         job.filePath = path.join(DOWNLOADS_DIR, match);
-        const actualExt = path.extname(match).replace('.', '') || ext;
-        job.downloadFilename = `${safeTitle}.${actualExt}`;
+        job.downloadFilename = match.replace(hashToken, '.');
         job.status = 'completed';
         job.percent = 100;
-
-        // Save URL record so user can save again without re-downloading
-        recordDownload(url, {
-          jobId,
-          url: url.trim(),
-          safeTitle,
-          downloadFilename: job.downloadFilename,
-          filePath: job.filePath,
-          downloadedAt: Date.now()
-        });
+        console.log(`✅ Download complete: "${job.downloadFilename}" (saved as ${match})`);
       } else {
         job.status = 'error';
         job.error = 'Downloaded file not found on disk.';
@@ -481,25 +482,14 @@ setInterval(() => {
     const now = Date.now();
     const files = fs.readdirSync(DOWNLOADS_DIR);
     for (const file of files) {
-      if (file === 'downloaded-urls.json' || file === 'downloads-cache.json') continue;
       const fullPath = path.join(DOWNLOADS_DIR, file);
       const stat = fs.statSync(fullPath);
       if (now - stat.mtimeMs > 24 * 60 * 60 * 1000) {
         fs.unlinkSync(fullPath);
       }
     }
-    // Prune stale URL records
-    const downloads = loadDownloads();
-    let changed = false;
-    for (const u of Object.keys(downloads)) {
-      if (!downloads[u].filePath || !fs.existsSync(downloads[u].filePath)) {
-        delete downloads[u];
-        changed = true;
-      }
-    }
-    if (changed) saveDownloads(downloads);
 
-    // Clean old jobs from map
+    // Clean old jobs from memory map
     for (const [id, job] of jobs.entries()) {
       if (now - job.createdAt > 24 * 60 * 60 * 1000) {
         jobs.delete(id);
