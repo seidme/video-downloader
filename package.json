@@ -1,0 +1,30 @@
+{
+  "name": "video-downloader",
+  "version": "1.0.0",
+  "description": "Universal Video & Audio Downloader supporting YouTube, Instagram, TikTok, Twitter/X, Reddit, Vimeo, and 1,800+ platforms with a modern browser UI and CLI.",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "cli": "node cli.js"
+  },
+  "keywords": [
+    "video-downloader",
+    "universal-downloader",
+    "youtube-downloader",
+    "tiktok-downloader",
+    "instagram-downloader",
+    "twitter-downloader",
+    "reddit-downloader",
+    "yt-dlp",
+    "nodejs",
+    "web-ui"
+  ],
+  "author": "seidme",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2"
+  }
+}

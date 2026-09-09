@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Universal Video Downloader — Download Any Video & Audio</title>
+  <meta name="description" content="Fast, clean, high-speed downloader for YouTube, TikTok, Instagram, Twitter/X, Reddit, Vimeo, and 1,800+ platforms. Convert to MP4, MP3, and 1080p HD.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Ambient background lighting effects -->
+  <div class="glow-sphere sphere-1"></div>
+  <div class="glow-sphere sphere-2"></div>
+  <div class="glow-sphere sphere-3"></div>
+
+  <div class="app-container">
+    <!-- Navbar -->
+    <header class="navbar">
+      <div class="brand">
+        <div class="logo-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-name">Omni<span class="gradient-text">Downloader</span></span>
+          <span class="brand-tag">Universal Media Engine</span>
+        </div>
+      </div>
+
+      <div class="engine-badge" id="engineStatusBadge" title="Engine Status">
+        <span class="status-dot"></span>
+        <span class="status-label" id="statusLabel">Checking engine...</span>
+      </div>
+    </header>
+
+    <!-- Main Hero Section -->
+    <main class="main-content">
+      <section class="hero-section">
+        <div class="badge-pill">
+          <span class="sparkle">✨</span>
+          <span>YouTube, TikTok, Twitter/X, Instagram, Vimeo & 1,800+ sites</span>
+        </div>
+        
+        <h1 class="hero-title">
+          Download Any Video <br>
+          <span class="gradient-text">In Highest Quality</span>
+        </h1>
+        
+        <p class="hero-desc">
+          Paste any link from YouTube, social media, or video sites. Automatically recognizes media, extracts high-res video, or converts to crystal-clear MP3.
+        </p>
+
+        <!-- Search Input Bar -->
+        <div class="input-card">
+          <form id="urlForm" class="url-form">
+            <div class="input-wrapper">
+              <span class="input-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                </svg>
+              </span>
+              <input 
+                type="url" 
+                id="videoUrlInput" 
+                placeholder="Paste video link here (YouTube, TikTok, Instagram, Twitter, etc.)..." 
+                autocomplete="off"
+                required
+              />
+              <button type="button" class="btn-paste" id="pasteBtn" title="Paste from Clipboard">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                  <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                </svg>
+                <span>Paste</span>
+              </button>
+            </div>
+            
+            <button type="submit" class="btn-primary" id="fetchBtn">
+              <span class="btn-text">Analyze Link</span>
+              <span class="spinner" id="fetchSpinner" style="display: none;"></span>
+            </button>
+          </form>
+
+          <!-- Quick samples -->
+          <div class="quick-samples">
+            <span class="samples-label">Quick test:</span>
+            <button class="sample-chip" data-url="https://www.youtube.com/watch?v=jNQXAC9IVRw">
+              YouTube Classic (Me at the zoo)
+            </button>
+          </div>
+        </div>
+
+        <!-- Notification / Error Box -->
+        <div class="alert-box" id="alertBox" style="display: none;">
+          <span class="alert-icon">⚠️</span>
+          <span class="alert-text" id="alertText"></span>
+        </div>
+
+        <!-- Video Preview & Format Selection Card -->
+        <div class="result-card" id="resultCard" style="display: none;">
+          <div class="result-grid">
+            <!-- Thumbnail Box -->
+            <div class="media-preview-container">
+              <div class="thumbnail-wrapper">
+                <img id="videoThumb" src="" alt="Video Thumbnail" />
+                <div class="duration-badge" id="videoDuration">0:00</div>
+                <div class="platform-tag" id="videoPlatform">YouTube</div>
+              </div>
+            </div>
+
+            <!-- Video Info & Options -->
+            <div class="media-details">
+              <h2 class="video-title" id="videoTitle">Video Title</h2>
+              
+              <div class="meta-row">
+                <div class="uploader-info">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                  </svg>
+                  <span id="videoUploader">Channel</span>
+                </div>
+
+                <div class="stat-item" id="viewsStatWrapper">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                  </svg>
+                  <span id="videoViews">-- views</span>
+                </div>
+              </div>
+
+              <!-- Format Mode Toggle (Video vs Audio) -->
+              <div class="format-tabs">
+                <button type="button" class="tab-btn active" id="tabVideo" data-mode="video">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
+                    <line x1="7" y1="2" x2="7" y2="22"></line>
+                    <line x1="17" y1="2" x2="17" y2="22"></line>
+                    <line x1="2" y1="12" x2="22" y2="12"></line>
+                    <line x1="2" y1="7" x2="7" y2="7"></line>
+                    <line x1="2" y1="17" x2="7" y2="17"></line>
+                    <line x1="17" y1="17" x2="22" y2="17"></line>
+                    <line x1="17" y1="7" x2="22" y2="7"></line>
+                  </svg>
+                  <span>Video (MP4)</span>
+                </button>
+                <button type="button" class="tab-btn" id="tabAudio" data-mode="audio">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 18V5l12-2v13"></path>
+                    <circle cx="6" cy="18" r="3"></circle>
+                    <circle cx="18" cy="16" r="3"></circle>
+                  </svg>
+                  <span>Audio Only (MP3)</span>
+                </button>
+              </div>
+
+              <!-- Quality Selector -->
+              <div class="quality-section">
+                <label class="section-label">Select Resolution / Quality:</label>
+                <div class="quality-chips" id="qualityOptions">
+                  <!-- Injected dynamically via JS -->
+                </div>
+              </div>
+
+              <!-- Download Action CTA -->
+              <div class="action-row">
+                <button type="button" class="btn-download" id="startDownloadBtn">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                  </svg>
+                  <span id="downloadBtnText">Download Now</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Live Progress Section -->
+          <div class="progress-container" id="progressSection" style="display: none;">
+            <div class="progress-header">
+              <div class="progress-status-line">
+                <span class="pulse-indicator"></span>
+                <span class="progress-status" id="progressStatusText">Initializing download...</span>
+              </div>
+              <span class="progress-percent" id="progressPercentText">0%</span>
+            </div>
+
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" id="progressBarFill" style="width: 0%;"></div>
+            </div>
+
+            <div class="progress-stats">
+              <div class="stat">Speed: <strong id="progressSpeed">-- KiB/s</strong></div>
+              <div class="stat">Estimated Size: <strong id="progressSize">--</strong></div>
+              <div class="stat">ETA: <strong id="progressEta">--:--</strong></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Download History -->
+        <div class="history-section" id="historySection" style="display: none;">
+          <div class="history-header">
+            <h3>Recent Downloads</h3>
+            <button class="btn-text-only" id="clearHistoryBtn">Clear History</button>
+          </div>
+          <div class="history-list" id="historyList"></div>
+        </div>
+      </section>
+
+      <!-- Supported Sites Showcase -->
+      <section class="platforms-showcase">
+        <h3 class="platforms-title">Supported Everywhere</h3>
+        <div class="platforms-grid">
+          <div class="platform-card">
+            <span class="platform-icon">▶️</span>
+            <strong>YouTube</strong>
+            <span>4K, 1080p, 60fps & MP3</span>
+          </div>
+          <div class="platform-card">
+            <span class="platform-icon">🎵</span>
+            <strong>TikTok</strong>
+            <span>HD & Audio without blur</span>
+          </div>
+          <div class="platform-card">
+            <span class="platform-icon">📸</span>
+            <strong>Instagram</strong>
+            <span>Reels, Stories & Posts</span>
+          </div>
+          <div class="platform-card">
+            <span class="platform-icon">🐦</span>
+            <strong>Twitter / X</strong>
+            <span>All shared clips & video</span>
+          </div>
+          <div class="platform-card">
+            <span class="platform-icon">👾</span>
+            <strong>Reddit</strong>
+            <span>Video with synchronized audio</span>
+          </div>
+          <div class="platform-card">
+            <span class="platform-icon">🎬</span>
+            <strong>Vimeo</strong>
+            <span>Original streaming quality</span>
+          </div>
+          <div class="platform-card">
+            <span class="platform-icon">🌐</span>
+            <strong>1,800+ Sites</strong>
+            <span>Direct .mp4, m3u8, and web</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="footer-content">
+        <p>OmniDownloader — Universal Video & Audio Downloader. Powered by <code>yt-dlp</code> and <code>ffmpeg</code>.</p>
+        <p class="copyright">Open source project created for seidme.</p>
+      </div>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
