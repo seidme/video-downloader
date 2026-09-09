@@ -321,7 +321,7 @@ app.post('/api/download/start', (req, res) => {
 
   const isVideo = type !== 'audio';
   const durationOver1h = typeof duration === 'number' && duration > 3600;
-  const isBypassed = bypassPassword === 'leptir';
+  const isBypassed = bypassPassword === BYPASS_PASSWORD;
 
   if (isVideo && durationOver1h && !isBypassed) {
     return res.status(403).json({

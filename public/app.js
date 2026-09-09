@@ -37,6 +37,7 @@ const bypassBtn = document.getElementById('bypassBtn');
 const bypassMessage = document.getElementById('bypassMessage');
 
 let isBypassed = false;
+let verifiedBypassPassword = '';
 
 // Progress DOM
 const progressSection = document.getElementById('progressSection');
@@ -209,6 +210,7 @@ function renderMediaPreview(media) {
 
   // Reset restriction state for new media
   isBypassed = false;
+  verifiedBypassPassword = '';
   if (bypassPasswordInput) bypassPasswordInput.value = '';
   if (bypassMessage) {
     bypassMessage.textContent = '';
@@ -331,6 +333,7 @@ async function handleBypassAttempt() {
     const data = await res.json();
     if (res.ok && data.valid) {
       isBypassed = true;
+      verifiedBypassPassword = pwd;
       if (bypassMessage) {
         bypassMessage.textContent = '✓ Unlocked!';
         bypassMessage.className = 'bypass-message success';
@@ -428,7 +431,7 @@ async function startDownload() {
         quality: selectedQuality,
         title: currentMedia.title,
         duration: currentMedia.duration,
-        bypassPassword: isBypassed ? 'leptir' : (bypassPasswordInput ? bypassPasswordInput.value.trim() : '')
+        bypassPassword: isBypassed ? verifiedBypassPassword : (bypassPasswordInput ? bypassPasswordInput.value.trim() : '')
       })
     });
 
