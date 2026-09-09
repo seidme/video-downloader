@@ -79,37 +79,21 @@ function getUrlHash(url) {
   return crypto.createHash('md5').update(url.trim()).digest('hex').substring(0, 6);
 }
 
-// Clean quality tag for filename: [1080p], [720p], [320k], [192k], [m4a], [best]
-function getQualityTag(type, quality) {
-  if (type === 'audio') {
-    if (quality === 'm4a') return 'm4a';
-    if (quality === 'mp3_192') return '192k';
-    return '320k';
-  }
-  if (quality === '1080') return '1080p';
-  if (quality === '720') return '720p';
-  if (quality === '480') return '480p';
-  if (quality === '360') return '360p';
-  return 'best';
-}
-
-function getExistingDownload(url, type = null, quality = null) {
+function getExistingDownload(url, quality = null) {
   if (!url) return null;
   const hash = getUrlHash(url);
-  const qualityTag = quality ? getQualityTag(type, quality) : null;
 
   try {
     const files = fs.readdirSync(DOWNLOADS_DIR);
     let match = null;
 
-    if (qualityTag) {
+    if (quality) {
       // Look for exact quality + hash match: e.g. "[1080p] [a1b2c3]."
-      const exactTag = `[${qualityTag}] [${hash}].`;
-      match = files.find(f => f.includes(exactTag));
+      match = files.find(f => f.includes(`[${quality}] [${hash}].`));
     }
 
     // If no quality specified (e.g. general link check), match any existing download for this URL
-    if (!match && !qualityTag) {
+    if (!match && !quality) {
       match = files.find(f => f.includes(`[${hash}].`));
     }
 
@@ -243,14 +227,14 @@ app.post('/api/info', async (req, res) => {
       const availableVideoQualities = [
         { id: 'best', label: 'Best Quality (Auto)', res: 'Original / Max' }
       ];
-      if (has1080) availableVideoQualities.push({ id: '1080', label: '1080p Full HD', res: '1080p' });
-      if (has720) availableVideoQualities.push({ id: '720', label: '720p HD', res: '720p' });
-      if (has480) availableVideoQualities.push({ id: '480', label: '480p SD', res: '480p' });
-      if (has360) availableVideoQualities.push({ id: '360', label: '360p', res: '360p' });
+      if (has1080) availableVideoQualities.push({ id: '1080p', label: '1080p Full HD', res: '1080p' });
+      if (has720) availableVideoQualities.push({ id: '720p', label: '720p HD', res: '720p' });
+      if (has480) availableVideoQualities.push({ id: '480p', label: '480p SD', res: '480p' });
+      if (has360) availableVideoQualities.push({ id: '360p', label: '360p', res: '360p' });
 
       const availableAudioQualities = [
-        { id: 'mp3_320', label: 'MP3 - High (320 kbps)', ext: 'mp3' },
-        { id: 'mp3_192', label: 'MP3 - Standard (192 kbps)', ext: 'mp3' },
+        { id: '320k', label: 'MP3 - High (320 kbps)', ext: 'mp3' },
+        { id: '192k', label: 'MP3 - Standard (192 kbps)', ext: 'mp3' },
         { id: 'm4a', label: 'M4A - AAC Audio', ext: 'm4a' }
       ];
 
@@ -311,7 +295,8 @@ app.post('/api/download/start', (req, res) => {
   }
 
   // If user already downloaded this exact URL & quality, offer to save immediately!
-  const existing = getExistingDownload(url, type, quality);
+  const qTag = quality || (type === 'audio' ? '320k' : 'best');
+  const existing = getExistingDownload(url, qTag);
   if (existing) {
     console.log(`⚡ Already downloaded file requested, offering immediate save: "${existing.downloadFilename}"`);
     return res.json({
@@ -345,7 +330,6 @@ app.post('/api/download/start', (req, res) => {
   const safeTitle = sanitizeFilename(title);
   const ext = type === 'audio' ? (quality === 'm4a' ? 'm4a' : 'mp3') : 'mp4';
   const urlHash = getUrlHash(url);
-  const qTag = getQualityTag(type, quality);
   const outputTemplate = path.join(DOWNLOADS_DIR, `${safeTitle} [${qTag}] [${urlHash}].%(ext)s`);
 
   // Build yt-dlp arguments
@@ -364,20 +348,15 @@ app.post('/api/download/start', (req, res) => {
       args.push('--audio-format', 'm4a');
     } else {
       args.push('--audio-format', 'mp3');
-      const bitrate = quality === 'mp3_192' ? '192k' : '320k';
+      const bitrate = quality === '192k' ? '192k' : '320k';
       args.push('--audio-quality', bitrate);
     }
   } else {
     // Video
     let formatFilter = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best';
-    if (quality === '1080') {
-      formatFilter = 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best';
-    } else if (quality === '720') {
-      formatFilter = 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best';
-    } else if (quality === '480') {
-      formatFilter = 'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]/best';
-    } else if (quality === '360') {
-      formatFilter = 'bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best[height<=360][ext=mp4]/best';
+    const height = parseInt(quality, 10);
+    if (height && !isNaN(height)) {
+      formatFilter = `bestvideo[height<=${height}][ext=mp4]+bestaudio[ext=m4a]/best[height<=${height}][ext=mp4]/best`;
     }
     args.push('-f', formatFilter);
     args.push('--merge-output-format', 'mp4');
