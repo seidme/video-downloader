@@ -3,7 +3,7 @@
 A modern, high-performance web application and CLI to download video and audio from **YouTube, TikTok, Twitter/X, Instagram, Vimeo, Reddit, Twitch, and 1,800+ other platforms** in highest available quality (up to 4K / 1080p Full HD) or convert straight to MP3 audio.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Node](https://img.shields.io/badge/node-%3E%3D20.0.0-green.svg)
+![Node](<https://img.shields.io/badge/node-%3E%3D20.0.0-green.svg>)
 ![yt--dlp](https://img.shields.io/badge/engine-yt--dlp-purple.svg)
 ![ffmpeg](https://img.shields.io/badge/muxing-ffmpeg-red.svg)
 
@@ -21,43 +21,27 @@ A modern, high-performance web application and CLI to download video and audio f
 
 ---
 
-## 🛠️ Prerequisites
-
-**Video Downloader** requires **Node.js** (v18+) and the **yt-dlp** and **ffmpeg** binaries:
-
-### macOS (via Homebrew)
-```bash
-brew install yt-dlp ffmpeg
-```
-
-### Ubuntu / Debian
-```bash
-sudo apt update && sudo apt install ffmpeg
-sudo wget https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -O /usr/local/bin/yt-dlp
-sudo chmod a+rx /usr/local/bin/yt-dlp
-```
-
----
 
 ## 🚀 Quick Start (Browser App)
 
 1. **Clone the repository**:
+
    ```bash
    git clone git@github.com:seidme/video-downloader.git
    cd video-downloader
    ```
-
 2. **Install dependencies**:
+
    ```bash
    npm install
    ```
-
 3. **Start the local server**:
+
    ```bash
    npm start
    ```
-
 4. **Open in your browser**:
+
    ```
    http://localhost:3000
    ```

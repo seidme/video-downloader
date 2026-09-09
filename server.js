@@ -119,6 +119,8 @@ app.post('/api/info', async (req, res) => {
   const env = { ...process.env, PATH: `/opt/homebrew/bin:/usr/local/bin:${process.env.PATH}` };
   const child = spawn(YTDLP_BIN, args, { env });
 
+  const infoTimeout = setTimeout(() => { child.kill(); }, 30 * 1000);
+
   let stdout = '';
   let stderr = '';
 
@@ -126,6 +128,8 @@ app.post('/api/info', async (req, res) => {
   child.stderr.on('data', chunk => stderr += chunk);
 
   child.on('close', code => {
+    clearTimeout(infoTimeout);
+
     if (code !== 0) {
       console.error('yt-dlp error:', stderr);
       let message = 'Failed to extract video information from this URL.';
@@ -217,6 +221,7 @@ app.post('/api/info', async (req, res) => {
   });
 
   child.on('error', err => {
+    clearTimeout(infoTimeout);
     res.status(500).json({ error: `Engine error: ${err.message}` });
   });
 });
@@ -334,9 +339,21 @@ app.post('/api/download/start', (req, res) => {
   const child = spawn(YTDLP_BIN, args, { env });
   job.process = child;
 
+  const resetWatchdog = () => {
+    if (job.watchdog) clearTimeout(job.watchdog);
+    job.watchdog = setTimeout(() => {
+      child.kill();
+      job.status = 'error';
+      job.error = 'Download stalled — no progress for 120 seconds.';
+    }, 120 * 1000);
+  };
+  resetWatchdog();
+
   let fullStderr = '';
 
   child.stdout.on('data', chunk => {
+    resetWatchdog();
+
     const text = chunk.toString();
     const lines = text.split('\n');
     for (const line of lines) {
@@ -361,6 +378,33 @@ app.post('/api/download/start', (req, res) => {
   });
 
   child.on('close', code => {
+    if (job.watchdog) clearTimeout(job.watchdog);
+    job.process = null;
+
+    if (job.status === 'cancelled') {
+      console.log(`🛑 Download cancelled by user: "${targetFilename}"`);
+      // Clean up partial/temporary files for this exact file
+      try {
+        if (fs.existsSync(targetFilePath)) fs.unlinkSync(targetFilePath);
+        const partFile = `${targetFilePath}.part`;
+        const ytdlFile = `${targetFilePath}.ytdl`;
+        if (fs.existsSync(partFile)) fs.unlinkSync(partFile);
+        if (fs.existsSync(ytdlFile)) fs.unlinkSync(ytdlFile);
+
+        // Also check if yt-dlp created intermediate audio/video parts with targetFilename prefix
+        const files = fs.readdirSync(DOWNLOADS_DIR);
+        for (const file of files) {
+          if (file.startsWith(targetFilename) || file.startsWith(`${safeTitle} [${qTag}] [${urlHash}]`)) {
+            const fullPath = path.join(DOWNLOADS_DIR, file);
+            if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+          }
+        }
+      } catch (cleanupErr) {
+        console.error('Error cleaning up cancelled files:', cleanupErr);
+      }
+      return;
+    }
+
     if (code === 0 && fs.existsSync(targetFilePath)) {
       job.filePath = targetFilePath;
       job.downloadFilename = targetFilename;
@@ -374,8 +418,12 @@ app.post('/api/download/start', (req, res) => {
   });
 
   child.on('error', err => {
-    job.status = 'error';
-    job.error = err.message;
+    if (job.watchdog) clearTimeout(job.watchdog);
+    job.process = null;
+    if (job.status !== 'cancelled') {
+      job.status = 'error';
+      job.error = err.message;
+    }
   });
 
   res.json({ jobId });
@@ -400,6 +448,60 @@ app.get('/api/download/progress/:jobId', (req, res) => {
     error: job.error,
     fileReady: job.status === 'completed'
   });
+});
+
+// POST /api/download/cancel/:jobId - Cancel an active download
+app.post('/api/download/cancel/:jobId', (req, res) => {
+  const { jobId } = req.params;
+  const job = jobs.get(jobId);
+  if (!job) {
+    return res.status(404).json({ error: 'Download job not found.' });
+  }
+
+  if (job.status === 'completed') {
+    return res.status(400).json({ error: 'Download has already completed.' });
+  }
+
+  if (job.status === 'cancelled') {
+    return res.json({ success: true, message: 'Download already cancelled.' });
+  }
+
+  job.status = 'cancelled';
+  if (job.watchdog) {
+    clearTimeout(job.watchdog);
+    job.watchdog = null;
+  }
+
+  if (job.process) {
+    job.process.kill();
+    job.process = null;
+  }
+
+  // Clean up partial files immediately if any
+  try {
+    if (job.targetFilePath && fs.existsSync(job.targetFilePath)) {
+      fs.unlinkSync(job.targetFilePath);
+    }
+    const partFile = `${job.targetFilePath}.part`;
+    const ytdlFile = `${job.targetFilePath}.ytdl`;
+    if (fs.existsSync(partFile)) fs.unlinkSync(partFile);
+    if (fs.existsSync(ytdlFile)) fs.unlinkSync(ytdlFile);
+
+    if (job.targetFilename) {
+      const basePrefix = `${job.safeTitle} [${job.quality}] [${getUrlHash(job.url)}]`;
+      const files = fs.readdirSync(DOWNLOADS_DIR);
+      for (const file of files) {
+        if (file.startsWith(job.targetFilename) || file.startsWith(basePrefix)) {
+          const fullPath = path.join(DOWNLOADS_DIR, file);
+          if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Error cleaning up files on cancel:', err);
+  }
+
+  res.json({ success: true, message: 'Download cancelled successfully.' });
 });
 
 // GET /api/download/file/:jobId - Stream completed download file
@@ -458,3 +560,18 @@ app.listen(PORT, () => {
   console.log(`⚙️  ffmpeg: ${FFMPEG_BIN}`);
   console.log(`====================================================`);
 });
+
+// Graceful shutdown: kill active downloads on exit
+function gracefulShutdown() {
+  console.log('\n🛑 Shutting down — killing active downloads...');
+  for (const [id, job] of jobs.entries()) {
+    if (job.process) {
+      job.process.kill();
+      job.process = null;
+    }
+  }
+  process.exit(0);
+}
+
+process.on('SIGINT', gracefulShutdown);
+process.on('SIGTERM', gracefulShutdown);

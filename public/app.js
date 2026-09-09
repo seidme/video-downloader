@@ -32,10 +32,13 @@ const downloadBtnText = document.getElementById('downloadBtnText');
 const progressSection = document.getElementById('progressSection');
 const progressStatusText = document.getElementById('progressStatusText');
 const progressPercentText = document.getElementById('progressPercentText');
+const cancelDownloadBtn = document.getElementById('cancelDownloadBtn');
 const progressBarFill = document.getElementById('progressBarFill');
 const progressSpeed = document.getElementById('progressSpeed');
 const progressSize = document.getElementById('progressSize');
 const progressEta = document.getElementById('progressEta');
+
+let activeJobId = null;
 
 // History DOM
 const historySection = document.getElementById('historySection');
@@ -61,14 +64,45 @@ function setupEventListeners() {
 
   // Paste from clipboard button
   pasteBtn.addEventListener('click', async () => {
-    try {
-      const text = await navigator.clipboard.readText();
-      if (text) {
-        videoUrlInput.value = text.trim();
-        await fetchVideoInfo(text.trim());
+    let pastedText = '';
+
+    // 1. Try modern navigator.clipboard API
+    if (navigator.clipboard && typeof navigator.clipboard.readText === 'function') {
+      try {
+        pastedText = await navigator.clipboard.readText();
+      } catch (err) {
+        console.warn('Clipboard readText permission or API error:', err);
       }
-    } catch (err) {
+    }
+
+    // 2. If modern API didn't produce text, try focus + execCommand fallback
+    if (!pastedText) {
       videoUrlInput.focus();
+      videoUrlInput.select();
+      try {
+        const success = document.execCommand('paste');
+        if (success && videoUrlInput.value.trim()) {
+          pastedText = videoUrlInput.value.trim();
+        }
+      } catch (execErr) {
+        console.warn('execCommand paste fallback error:', execErr);
+      }
+    }
+
+    // 3. Process pasted text or guide user
+    if (pastedText && typeof pastedText === 'string') {
+      const trimmed = pastedText.trim();
+      videoUrlInput.value = trimmed;
+      videoUrlInput.dispatchEvent(new Event('input', { bubbles: true }));
+      videoUrlInput.focus();
+      if (trimmed) {
+        await fetchVideoInfo(trimmed);
+      }
+    } else {
+      // If browser security blocked reading clipboard programmatically
+      videoUrlInput.focus();
+      videoUrlInput.select();
+      // showAlert('Clipboard access was blocked by the browser. Please use Cmd+V (Mac) or Ctrl+V to paste directly into the box.');
     }
   });
 
@@ -78,6 +112,11 @@ function setupEventListeners() {
 
   // Start Download
   startDownloadBtn.addEventListener('click', startDownload);
+
+  // Cancel Download
+  if (cancelDownloadBtn) {
+    cancelDownloadBtn.addEventListener('click', cancelDownload);
+  }
 
   // Clear History
   clearHistoryBtn.addEventListener('click', () => {
@@ -155,6 +194,7 @@ function renderMediaPreview(media) {
     progressSection.style.display = 'block';
     progressStatusText.textContent = 'Download already running in background...';
     startDownloadBtn.disabled = true;
+    fetchBtn.disabled = true;
     pollJobProgress(media.activeJobId);
   }
 
@@ -219,6 +259,11 @@ async function startDownload() {
 
   hideAlert();
   startDownloadBtn.disabled = true;
+  fetchBtn.disabled = true;
+  if (cancelDownloadBtn) {
+    cancelDownloadBtn.style.display = 'inline-flex';
+    cancelDownloadBtn.disabled = false;
+  }
   progressSection.style.display = 'block';
   progressBarFill.style.width = '0%';
   progressPercentText.textContent = '0%';
@@ -246,6 +291,7 @@ async function startDownload() {
 
     // If download is already in progress, seamlessly attach to it!
     if (data.inProgress) {
+      activeJobId = data.jobId;
       progressStatusText.textContent = 'Attaching to download in progress...';
       pollJobProgress(data.jobId);
       return;
@@ -253,6 +299,7 @@ async function startDownload() {
 
     // If file is already downloaded and present on server, save instantly!
     if (data.cached) {
+      if (cancelDownloadBtn) cancelDownloadBtn.style.display = 'none';
       progressBarFill.style.width = '100%';
       progressPercentText.textContent = '100%';
       progressStatusText.textContent = '✓ Already downloaded! Saving to your computer...';
@@ -260,6 +307,7 @@ async function startDownload() {
       progressSize.textContent = 'Ready on Disk';
       progressEta.textContent = '0s';
       startDownloadBtn.disabled = false;
+      fetchBtn.disabled = false;
 
       // Trigger browser save dialog immediately
       triggerBrowserDownload(`/api/download/file/${data.jobId}`);
@@ -278,9 +326,12 @@ async function startDownload() {
       return;
     }
 
+    activeJobId = data.jobId;
     pollJobProgress(data.jobId);
   } catch (err) {
     startDownloadBtn.disabled = false;
+    fetchBtn.disabled = false;
+    if (cancelDownloadBtn) cancelDownloadBtn.style.display = 'none';
     showAlert(err.message || 'Error starting download.');
   }
 }
@@ -318,10 +369,13 @@ function pollJobProgress(jobId) {
 
       if (job.fileReady) {
         clearInterval(pollingTimer);
+        pollingTimer = null;
+        if (cancelDownloadBtn) cancelDownloadBtn.style.display = 'none';
         progressStatusText.textContent = '✓ Ready! Saving to your computer...';
         progressBarFill.style.width = '100%';
         progressPercentText.textContent = '100%';
         startDownloadBtn.disabled = false;
+        fetchBtn.disabled = false;
 
         // Trigger browser save dialog
         triggerBrowserDownload(`/api/download/file/${jobId}`);
@@ -337,15 +391,62 @@ function pollJobProgress(jobId) {
           filename: job.downloadFilename,
           timestamp: Date.now()
         });
+      } else if (job.status === 'cancelled') {
+        clearInterval(pollingTimer);
+        pollingTimer = null;
+        activeJobId = null;
+        progressStatusText.textContent = '🛑 Download cancelled';
+        startDownloadBtn.disabled = false;
+        fetchBtn.disabled = false;
+        if (cancelDownloadBtn) cancelDownloadBtn.style.display = 'none';
       } else if (job.status === 'error') {
         clearInterval(pollingTimer);
+        pollingTimer = null;
+        activeJobId = null;
         startDownloadBtn.disabled = false;
+        fetchBtn.disabled = false;
+        if (cancelDownloadBtn) cancelDownloadBtn.style.display = 'none';
         showAlert(job.error || 'Download encountered an error.');
       }
     } catch (e) {
       console.error('Polling error:', e);
     }
   }, 700);
+}
+
+// Cancel current download job
+async function cancelDownload() {
+  if (!activeJobId) return;
+
+  if (cancelDownloadBtn) {
+    cancelDownloadBtn.disabled = true;
+    cancelDownloadBtn.querySelector('span').textContent = 'Cancelling...';
+  }
+
+  try {
+    const res = await fetch(`/api/download/cancel/${activeJobId}`, { method: 'POST' });
+    const data = await res.json();
+    if (pollingTimer) {
+      clearInterval(pollingTimer);
+      pollingTimer = null;
+    }
+    progressStatusText.textContent = '🛑 Download cancelled';
+    startDownloadBtn.disabled = false;
+    fetchBtn.disabled = false;
+    if (cancelDownloadBtn) {
+      cancelDownloadBtn.style.display = 'none';
+      cancelDownloadBtn.querySelector('span').textContent = 'Cancel';
+      cancelDownloadBtn.disabled = false;
+    }
+    activeJobId = null;
+  } catch (err) {
+    console.error('Failed to cancel download:', err);
+    showAlert('Failed to cancel download.');
+    if (cancelDownloadBtn) {
+      cancelDownloadBtn.disabled = false;
+      cancelDownloadBtn.querySelector('span').textContent = 'Cancel';
+    }
+  }
 }
 
 // Trigger Native Browser File Download

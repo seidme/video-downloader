@@ -610,11 +610,43 @@ body {
   color: var(--text-muted);
 }
 
+.progress-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .progress-percent {
   font-family: var(--font-heading);
   font-size: 1rem;
   font-weight: 700;
   color: #fff;
+}
+
+.btn-cancel-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+  font-size: 0.76rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-cancel-download:hover {
+  background: rgba(239, 68, 68, 0.3);
+  border-color: rgba(239, 68, 68, 0.6);
+  color: #fee2e2;
+}
+
+.btn-cancel-download:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .progress-bar-bg {
