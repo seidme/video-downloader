@@ -293,6 +293,14 @@ app.get('/api/stats', (req, res) => {
   let targetLogs = auditLogs;
   if (filter === 'ok' || filter === 'success') {
     targetLogs = auditLogs.filter(l => l.action === 'download_completed' || l.action === 'download_cached_hit');
+  } else if (filter === 'error' || filter === 'errors' || filter === 'fail') {
+    targetLogs = auditLogs.filter(l => 
+      l.action === 'download_error' || 
+      l.action === 'info_error' || 
+      l.action === 'restriction_blocked' ||
+      (l.action === 'bypass_attempt' && l.details?.toLowerCase().includes('incorrect')) ||
+      l.action === 'error'
+    );
   }
 
   const limit = Math.min(parseInt(req.query.limit, 10) || 50, 1000);

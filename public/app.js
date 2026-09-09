@@ -211,6 +211,38 @@ function setupEventListeners() {
       }
     });
   }
+
+  // Error Stats (Errors, blocked restrictions, failed downloads)
+  const errorStatsBtn = document.getElementById('errorStatsBtn');
+  const errorStatsBtnText = document.getElementById('errorStatsBtnText');
+
+  if (errorStatsBtn) {
+    errorStatsBtn.addEventListener('click', async () => {
+      try {
+        if (errorStatsBtnText) errorStatsBtnText.textContent = 'Checking...';
+        errorStatsBtn.disabled = true;
+
+        const res = await fetch('/api/stats?filter=error&limit=100');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        console.log(data);
+
+        if (errorStatsBtnText) errorStatsBtnText.textContent = '✓ Logged to Console';
+        setTimeout(() => {
+          if (errorStatsBtnText) errorStatsBtnText.textContent = 'Error Stats';
+          errorStatsBtn.disabled = false;
+        }, 3000);
+      } catch (err) {
+        console.error('Failed to fetch Error stats:', err);
+        if (errorStatsBtnText) errorStatsBtnText.textContent = 'Error';
+        setTimeout(() => {
+          if (errorStatsBtnText) errorStatsBtnText.textContent = 'Error Stats';
+          errorStatsBtn.disabled = false;
+        }, 3000);
+      }
+    });
+  }
 }
 
 // Show/Hide Alert
