@@ -211,6 +211,15 @@ app.post('/api/info', async (req, res) => {
       // Check if this exact URL was already downloaded
       const existing = getExistingDownload(trimmedUrl);
 
+      // Check if download for this URL is currently in progress
+      let activeJobId = null;
+      for (const [id, activeJob] of jobs.entries()) {
+        if (activeJob.url === trimmedUrl && (activeJob.status === 'downloading' || activeJob.status === 'processing')) {
+          activeJobId = activeJob.jobId;
+          break;
+        }
+      }
+
       res.json({
         id: data.id,
         title: data.title || 'Untitled Media',
@@ -230,7 +239,9 @@ app.post('/api/info', async (req, res) => {
           jobId: existing.jobId,
           downloadFilename: existing.downloadFilename,
           downloadUrl: `/api/download/file/${existing.jobId}`
-        } : null
+        } : null,
+        isDownloading: !!activeJobId,
+        activeJobId
       });
     } catch (parseErr) {
       console.error('Failed to parse metadata JSON:', parseErr);
@@ -278,7 +289,20 @@ app.post('/api/download/start', (req, res) => {
     });
   }
 
-  // 2. Otherwise, start fresh download
+  // 2. Check if a download for this exact URL is ALREADY IN PROGRESS
+  const trimmedUrl = url.trim();
+  for (const [id, activeJob] of jobs.entries()) {
+    if (activeJob.url === trimmedUrl && (activeJob.status === 'downloading' || activeJob.status === 'processing')) {
+      console.log(`⏳ Download already in progress for: ${trimmedUrl} (attaching to job ${activeJob.jobId})`);
+      return res.json({
+        jobId: activeJob.jobId,
+        inProgress: true,
+        message: 'Download is already in progress, attaching to current job.'
+      });
+    }
+  }
+
+  // 3. Otherwise, start fresh download
   const jobId = crypto.randomUUID();
   const safeTitle = sanitizeFilename(title);
   const ext = type === 'audio' ? (quality === 'm4a' ? 'm4a' : 'mp3') : 'mp4';

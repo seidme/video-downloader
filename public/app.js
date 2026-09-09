@@ -149,6 +149,15 @@ function renderMediaPreview(media) {
   switchMode('video');
 
   resultCard.style.display = 'block';
+
+  // If this video is currently downloading in background, attach immediately!
+  if (media.isDownloading && media.activeJobId) {
+    progressSection.style.display = 'block';
+    progressStatusText.textContent = 'Download already running in background...';
+    startDownloadBtn.disabled = true;
+    pollJobProgress(media.activeJobId);
+  }
+
   resultCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
@@ -237,6 +246,13 @@ async function startDownload() {
     const data = await res.json();
     if (!res.ok) {
       throw new Error(data.error || 'Failed to start download.');
+    }
+
+    // If download is already in progress, seamlessly attach to it!
+    if (data.inProgress) {
+      progressStatusText.textContent = 'Attaching to download in progress...';
+      pollJobProgress(data.jobId);
+      return;
     }
 
     // If file is already downloaded and present on server, save instantly!
