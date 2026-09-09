@@ -162,11 +162,7 @@ function renderMediaPreview(media) {
 }
 
 function updateDownloadButtonText() {
-  if (currentMedia && currentMedia.alreadyDownloaded) {
-    downloadBtnText.textContent = '💾 Save File (Already Downloaded)';
-  } else {
-    downloadBtnText.textContent = currentMode === 'video' ? 'Download Video (MP4)' : 'Download Audio (MP3)';
-  }
+  downloadBtnText.textContent = currentMode === 'video' ? 'Download Video (MP4)' : 'Download Audio (MP3)';
 }
 
 // Switch between Video and Audio Mode

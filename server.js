@@ -79,24 +79,13 @@ function getUrlHash(url) {
   return crypto.createHash('md5').update(url.trim()).digest('hex').substring(0, 6);
 }
 
-function getExistingDownload(url, quality = null) {
-  if (!url) return null;
+function getExistingDownload(url, quality) {
+  if (!url || !quality) return null;
   const hash = getUrlHash(url);
 
   try {
     const files = fs.readdirSync(DOWNLOADS_DIR);
-    let match = null;
-
-    if (quality) {
-      // Look for exact quality + hash match: e.g. "[1080p] [a1b2c3]."
-      match = files.find(f => f.includes(`[${quality}] [${hash}].`));
-    }
-
-    // If no quality specified (e.g. general link check), match any existing download for this URL
-    if (!match && !quality) {
-      match = files.find(f => f.includes(`[${hash}].`));
-    }
-
+    const match = files.find(f => f.includes(`[${quality}] [${hash}].`));
     if (!match) return null;
 
     const filePath = path.join(DOWNLOADS_DIR, match);
@@ -250,9 +239,6 @@ app.post('/api/info', async (req, res) => {
         }
       }
 
-      // Check if this exact URL was already downloaded
-      const existing = getExistingDownload(trimmedUrl);
-
       res.json({
         id: data.id,
         title: data.title || 'Untitled Media',
@@ -267,12 +253,6 @@ app.post('/api/info', async (req, res) => {
         webpageUrl: data.webpage_url || trimmedUrl,
         videoQualities: availableVideoQualities,
         audioQualities: availableAudioQualities,
-        alreadyDownloaded: !!existing,
-        existingDownload: existing ? {
-          jobId: existing.jobId,
-          downloadFilename: existing.downloadFilename,
-          downloadUrl: `/api/download/file/${existing.jobId}`
-        } : null,
         isDownloading: !!activeJobId,
         activeJobId
       });
