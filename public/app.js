@@ -12,8 +12,6 @@ const fetchSpinner = document.getElementById('fetchSpinner');
 const pasteBtn = document.getElementById('pasteBtn');
 const alertBox = document.getElementById('alertBox');
 const alertText = document.getElementById('alertText');
-const engineStatusBadge = document.getElementById('engineStatusBadge');
-const statusLabel = document.getElementById('statusLabel');
 
 // Result Card DOM
 const resultCard = document.getElementById('resultCard');
@@ -46,26 +44,9 @@ const clearHistoryBtn = document.getElementById('clearHistoryBtn');
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
-  checkEngineHealth();
   renderHistory();
   setupEventListeners();
 });
-
-// Check Server Engine Health
-async function checkEngineHealth() {
-  try {
-    const res = await fetch('/api/health');
-    const data = await res.json();
-    if (data.status === 'online') {
-      engineStatusBadge.classList.add('online');
-      statusLabel.textContent = `Engine Ready (yt-dlp v${data.ytdlp})`;
-    } else {
-      statusLabel.textContent = 'Engine Offline';
-    }
-  } catch (err) {
-    statusLabel.textContent = 'Server Offline';
-  }
-}
 
 // Setup Event Listeners
 function setupEventListeners() {
@@ -89,15 +70,6 @@ function setupEventListeners() {
     } catch (err) {
       videoUrlInput.focus();
     }
-  });
-
-  // Sample chip click
-  document.querySelectorAll('.sample-chip').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const sampleUrl = btn.getAttribute('data-url');
-      videoUrlInput.value = sampleUrl;
-      fetchVideoInfo(sampleUrl);
-    });
   });
 
   // Format Tabs

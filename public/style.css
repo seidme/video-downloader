@@ -188,14 +188,14 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 16px;
-  background: rgba(138, 75, 255, 0.12);
-  border: 1px solid rgba(138, 75, 255, 0.3);
-  border-radius: var(--radius-full);
-  font-size: 0.82rem;
-  font-weight: 500;
-  color: #c4b5fd;
-  margin-bottom: 24px;
+  padding: 0;
+  background: none;
+  border: none;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #a78bfa;
+  margin-bottom: 16px;
+  letter-spacing: 0.01em;
 }
 
 .hero-title {
@@ -811,7 +811,19 @@ body {
 
 .copyright {
   margin-top: 6px;
-  font-size: 0.78rem;
+  font-size: 0.85rem;
+}
+
+.copyright a {
+  color: #c4b5fd;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  font-weight: 500;
+  transition: color 0.2s ease;
+}
+
+.copyright a:hover {
+  color: #fff;
 }
 
 /* Spinner */
