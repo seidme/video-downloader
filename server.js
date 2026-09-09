@@ -17,9 +17,10 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Downloads directory & Storage Limit (2 GB max)
+// Downloads directory & Storage Limit (2 GB max hard limit, purge at 60%)
 const DOWNLOADS_DIR = path.join(__dirname, 'downloads');
-const MAX_STORAGE_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB
+const MAX_STORAGE_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB max hard limit
+const PURGE_THRESHOLD_BYTES = MAX_STORAGE_BYTES * 0.6; // Start purging at 60% (1.2 GB)
 const MAX_FILE_SIZE_BYTES = 1024 * 1024 * 1024; // 1 GB
 const BYPASS_PASSWORD = 'leptir';
 
@@ -49,11 +50,11 @@ function getStorageUsage() {
   }
 }
 
-// Helper: Enforce 2 GB volume limit by purging oldest files if needed
+// Helper: Enforce volume quota (starts purging oldest files at 60% / 1.2 GB, hard cap at 2 GB)
 function ensureStorageQuota(headroomBytes = 50 * 1024 * 1024) {
   try {
     let { totalBytes, details } = getStorageUsage();
-    if (totalBytes + headroomBytes <= MAX_STORAGE_BYTES) {
+    if (totalBytes + headroomBytes <= PURGE_THRESHOLD_BYTES) {
       return { ok: true, totalBytes };
     }
 
@@ -69,7 +70,7 @@ function ensureStorageQuota(headroomBytes = 50 * 1024 * 1024) {
 
     let purgedBytes = 0;
     for (const item of details) {
-      if (totalBytes + headroomBytes <= MAX_STORAGE_BYTES) break;
+      if (totalBytes + headroomBytes <= PURGE_THRESHOLD_BYTES) break;
       if (activePaths.has(item.fullPath)) continue;
 
       try {
@@ -165,6 +166,8 @@ app.get('/api/health', (req, res) => {
         usedMB: (totalBytes / (1024 * 1024)).toFixed(2),
         maxBytes: MAX_STORAGE_BYTES,
         maxGB: (MAX_STORAGE_BYTES / (1024 * 1024 * 1024)).toFixed(1),
+        purgeThresholdBytes: PURGE_THRESHOLD_BYTES,
+        purgeThresholdMB: (PURGE_THRESHOLD_BYTES / (1024 * 1024)).toFixed(0),
         usagePercent: ((totalBytes / MAX_STORAGE_BYTES) * 100).toFixed(1)
       }
     });
