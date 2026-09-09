@@ -289,10 +289,17 @@ app.get('/api/stats', (req, res) => {
     mtimeMs: d.mtimeMs
   })).sort((a, b) => b.mtimeMs - a.mtimeMs);
 
+  const filter = (req.query.filter || req.query.status || '').toLowerCase();
+  let targetLogs = auditLogs;
+  if (filter === 'ok' || filter === 'success') {
+    targetLogs = auditLogs.filter(l => l.action === 'download_completed' || l.action === 'download_cached_hit');
+  }
+
   const limit = Math.min(parseInt(req.query.limit, 10) || 50, 1000);
 
   res.json({
     status: 'online',
+    filter: filter || 'all',
     timestamp: new Date().toISOString(),
     history: {
       fileCount: details.length,
@@ -312,8 +319,8 @@ app.get('/api/stats', (req, res) => {
     },
     activeJobs: jobs.size,
     audit: {
-      totalCount: auditLogs.length,
-      recentLogs: auditLogs.slice(0, limit)
+      totalCount: targetLogs.length,
+      recentLogs: targetLogs.slice(0, limit)
     }
   });
 });

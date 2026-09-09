@@ -166,15 +166,47 @@ function setupEventListeners() {
 
         if (serverStatsBtnText) serverStatsBtnText.textContent = '✓ Logged to Console';
         setTimeout(() => {
-          if (serverStatsBtnText) serverStatsBtnText.textContent = 'Stats';
+          if (serverStatsBtnText) serverStatsBtnText.textContent = 'All Stats';
           serverStatsBtn.disabled = false;
         }, 3000);
       } catch (err) {
         console.error('Failed to fetch server stats:', err);
         if (serverStatsBtnText) serverStatsBtnText.textContent = 'Error';
         setTimeout(() => {
-          if (serverStatsBtnText) serverStatsBtnText.textContent = 'Stats';
+          if (serverStatsBtnText) serverStatsBtnText.textContent = 'All Stats';
           serverStatsBtn.disabled = false;
+        }, 3000);
+      }
+    });
+  }
+
+  // OK Stats (Successful downloads / conversions only)
+  const okStatsBtn = document.getElementById('okStatsBtn');
+  const okStatsBtnText = document.getElementById('okStatsBtnText');
+
+  if (okStatsBtn) {
+    okStatsBtn.addEventListener('click', async () => {
+      try {
+        if (okStatsBtnText) okStatsBtnText.textContent = 'Checking...';
+        okStatsBtn.disabled = true;
+
+        const res = await fetch('/api/stats?filter=ok&limit=100');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        console.log(data);
+
+        if (okStatsBtnText) okStatsBtnText.textContent = '✓ Logged to Console';
+        setTimeout(() => {
+          if (okStatsBtnText) okStatsBtnText.textContent = 'OK Stats';
+          okStatsBtn.disabled = false;
+        }, 3000);
+      } catch (err) {
+        console.error('Failed to fetch OK stats:', err);
+        if (okStatsBtnText) okStatsBtnText.textContent = 'Error';
+        setTimeout(() => {
+          if (okStatsBtnText) okStatsBtnText.textContent = 'OK Stats';
+          okStatsBtn.disabled = false;
         }, 3000);
       }
     });

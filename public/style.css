@@ -828,6 +828,14 @@ body {
   gap: 10px;
 }
 
+.footer-stats-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
 .btn-server-stats {
   display: inline-flex;
   align-items: center;
@@ -857,6 +865,17 @@ body {
 
 .btn-server-stats:hover svg {
   transform: scale(1.1);
+}
+
+.btn-ok-stats svg {
+  color: #4ade80;
+}
+
+.btn-ok-stats:hover {
+  background: rgba(74, 222, 128, 0.12);
+  border-color: rgba(74, 222, 128, 0.4);
+  color: #bbf7d0;
+  box-shadow: 0 0 12px rgba(74, 222, 128, 0.2);
 }
 
 .footer code {
