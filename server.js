@@ -95,8 +95,13 @@ function getExistingDownload(url) {
   if (!url) return null;
   const data = loadDownloads();
   const entry = data[url.trim()];
-  if (entry && entry.filePath && fs.existsSync(entry.filePath)) {
-    return entry;
+  if (entry) {
+    if (entry.filePath && fs.existsSync(entry.filePath)) {
+      return entry;
+    }
+    // File was purged or deleted: prune stale record immediately
+    delete data[url.trim()];
+    saveDownloads(data);
   }
   return null;
 }
