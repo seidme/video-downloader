@@ -20,6 +20,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Downloads directory & Storage Limit (2 GB max)
 const DOWNLOADS_DIR = path.join(__dirname, 'downloads');
 const MAX_STORAGE_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB
+const MAX_FILE_SIZE_BYTES = 1024 * 1024 * 1024; // 1 GB
 const BYPASS_PASSWORD = 'leptir';
 
 if (!fs.existsSync(DOWNLOADS_DIR)) {
@@ -289,7 +290,7 @@ app.post('/api/info', async (req, res) => {
         duration: data.duration,
         durationFormatted: formatDuration(data.duration),
         filesize: data.filesize || data.filesize_approx || null,
-        isSizeRestricted: !!((data.filesize && data.filesize > 1024 * 1024 * 1024) || (data.filesize_approx && data.filesize_approx > 1024 * 1024 * 1024)),
+        isSizeRestricted: !!((data.filesize && data.filesize > MAX_FILE_SIZE_BYTES) || (data.filesize_approx && data.filesize_approx > MAX_FILE_SIZE_BYTES)),
         views: formatCount(data.view_count),
         likes: formatCount(data.like_count),
         thumbnail,
