@@ -73,32 +73,50 @@ function sanitizeFilename(name) {
     .substring(0, 150);
 }
 
-// URL Hash in filename helper: appends a compact 8-char hash to the filename on disk
+// URL Short Hash helper: compact 6-char hex hash
 function getUrlHash(url) {
   if (!url) return '';
-  return crypto.createHash('md5').update(url.trim()).digest('hex').substring(0, 8);
+  return crypto.createHash('md5').update(url.trim()).digest('hex').substring(0, 6);
 }
 
-function getExistingDownload(url, type = null) {
+// Clean quality tag for filename: [1080p], [720p], [320k], [192k], [m4a], [best]
+function getQualityTag(type, quality) {
+  if (type === 'audio') {
+    if (quality === 'm4a') return 'm4a';
+    if (quality === 'mp3_192') return '192k';
+    return '320k';
+  }
+  if (quality === '1080') return '1080p';
+  if (quality === '720') return '720p';
+  if (quality === '480') return '480p';
+  if (quality === '360') return '360p';
+  return 'best';
+}
+
+function getExistingDownload(url, type = null, quality = null) {
   if (!url) return null;
   const hash = getUrlHash(url);
-  const token = `__[${hash}].`;
+  const qualityTag = quality ? getQualityTag(type, quality) : null;
 
   try {
     const files = fs.readdirSync(DOWNLOADS_DIR);
     let match = null;
-    if (type === 'audio') {
-      match = files.find(f => f.includes(token) && (f.endsWith('.mp3') || f.endsWith('.m4a') || f.endsWith('.wav')));
-    } else if (type === 'video') {
-      match = files.find(f => f.includes(token) && (f.endsWith('.mp4') || f.endsWith('.webm') || f.endsWith('.mkv')));
-    } else {
-      match = files.find(f => f.includes(token));
+
+    if (qualityTag) {
+      // Look for exact quality + hash match: e.g. "[1080p] [a1b2c3]."
+      const exactTag = `[${qualityTag}] [${hash}].`;
+      match = files.find(f => f.includes(exactTag));
+    }
+
+    // If no quality specified (e.g. general link check), match any existing download for this URL
+    if (!match && !qualityTag) {
+      match = files.find(f => f.includes(`[${hash}].`));
     }
 
     if (!match) return null;
 
     const filePath = path.join(DOWNLOADS_DIR, match);
-    const cleanFilename = match.replace(token, '.');
+    const downloadFilename = match; // Keep full filename as-is (no stripping)
 
     // Reuse existing in-memory job or create a transient one
     let existingJobId = null;
@@ -114,9 +132,9 @@ function getExistingDownload(url, type = null) {
       jobs.set(existingJobId, {
         jobId: existingJobId,
         url: url.trim(),
-        safeTitle: cleanFilename.substring(0, cleanFilename.lastIndexOf('.')) || 'media',
+        safeTitle: downloadFilename.substring(0, downloadFilename.lastIndexOf('.')) || 'media',
         filePath,
-        downloadFilename: cleanFilename,
+        downloadFilename,
         status: 'completed',
         percent: 100,
         fileReady: true,
@@ -129,7 +147,7 @@ function getExistingDownload(url, type = null) {
       jobId: existingJobId,
       url: url.trim(),
       filePath,
-      downloadFilename: cleanFilename
+      downloadFilename
     };
   } catch (e) {
     return null;
@@ -292,17 +310,17 @@ app.post('/api/download/start', (req, res) => {
     return res.status(400).json({ error: 'URL is required.' });
   }
 
-  // If user already downloaded this URL, don't download again - just offer to save!
-  const existing = getExistingDownload(url, type);
+  // If user already downloaded this exact URL & quality, offer to save immediately!
+  const existing = getExistingDownload(url, type, quality);
   if (existing) {
-    console.log(`⚡ Already downloaded URL requested, offering immediate save: "${existing.downloadFilename}"`);
+    console.log(`⚡ Already downloaded file requested, offering immediate save: "${existing.downloadFilename}"`);
     return res.json({
       jobId: existing.jobId,
       cached: true,
       fileReady: true,
       downloadFilename: existing.downloadFilename,
       downloadUrl: `/api/download/file/${existing.jobId}`,
-      message: 'Video already downloaded! Ready to save.'
+      message: 'File already downloaded! Ready to save.'
     });
   }
 
@@ -327,7 +345,8 @@ app.post('/api/download/start', (req, res) => {
   const safeTitle = sanitizeFilename(title);
   const ext = type === 'audio' ? (quality === 'm4a' ? 'm4a' : 'mp3') : 'mp4';
   const urlHash = getUrlHash(url);
-  const outputTemplate = path.join(DOWNLOADS_DIR, `${safeTitle}__[${urlHash}].%(ext)s`);
+  const qTag = getQualityTag(type, quality);
+  const outputTemplate = path.join(DOWNLOADS_DIR, `${safeTitle} [${qTag}] [${urlHash}].%(ext)s`);
 
   // Build yt-dlp arguments
   const args = [
@@ -418,16 +437,16 @@ app.post('/api/download/start', (req, res) => {
 
   child.on('close', code => {
     if (code === 0) {
-      // Find output file by urlHash token
+      // Find output file by exact tag or hash
       const files = fs.readdirSync(DOWNLOADS_DIR);
-      const hashToken = `__[${urlHash}].`;
-      const match = files.find(f => f.includes(hashToken));
+      const expectedTag = `[${qTag}] [${urlHash}].`;
+      const match = files.find(f => f.includes(expectedTag)) || files.find(f => f.includes(`[${urlHash}].`));
       if (match) {
         job.filePath = path.join(DOWNLOADS_DIR, match);
-        job.downloadFilename = match.replace(hashToken, '.');
+        job.downloadFilename = match; // Exact filename on disk, no stripping needed
         job.status = 'completed';
         job.percent = 100;
-        console.log(`✅ Download complete: "${job.downloadFilename}" (saved as ${match})`);
+        console.log(`✅ Download complete: "${job.downloadFilename}"`);
       } else {
         job.status = 'error';
         job.error = 'Downloaded file not found on disk.';
