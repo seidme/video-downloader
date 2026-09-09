@@ -1,4 +1,4 @@
-# 🎬 OmniDownloader — Universal Video & Audio Downloader
+# 🎬 Video Downloader — Universal Video & Audio Downloader
 
 A modern, high-performance web application and CLI to download video and audio from **YouTube, TikTok, Twitter/X, Instagram, Vimeo, Reddit, Twitch, and 1,800+ other platforms** in highest available quality (up to 4K / 1080p Full HD) or convert straight to MP3 audio.
 
@@ -23,7 +23,7 @@ A modern, high-performance web application and CLI to download video and audio f
 
 ## 🛠️ Prerequisites
 
-OmniDownloader requires **Node.js** (v18+) and the **yt-dlp** and **ffmpeg** binaries:
+**Video Downloader** requires **Node.js** (v18+) and the **yt-dlp** and **ffmpeg** binaries:
 
 ### macOS (via Homebrew)
 ```bash
