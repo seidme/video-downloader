@@ -143,32 +143,33 @@ body {
   color: var(--text-dim);
   font-weight: 600;
 }
+}
 
-.engine-badge {
-  display: flex;
+.badge-pill {
+  display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--border-subtle);
-  padding: 8px 14px;
+  padding: 8px 16px;
+  background: rgba(138, 75, 255, 0.1);
+  border: 1px solid rgba(138, 75, 255, 0.28);
   border-radius: var(--radius-full);
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  backdrop-filter: blur(10px);
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: #c4b5fd;
+  backdrop-filter: blur(12px);
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  transition: border-color 0.2s ease, background 0.2s ease;
 }
 
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background-color: var(--status-yellow);
-  box-shadow: 0 0 10px var(--status-yellow);
-  transition: all 0.3s ease;
+.badge-pill:hover {
+  background: rgba(138, 75, 255, 0.16);
+  border-color: rgba(138, 75, 255, 0.45);
 }
 
-.engine-badge.online .status-dot {
-  background-color: var(--status-green);
-  box-shadow: 0 0 12px var(--status-green);
+.badge-pill .sparkle {
+  font-size: 0.95rem;
+  line-height: 1;
 }
 
 /* Main Hero */
@@ -182,20 +183,6 @@ body {
   flex-direction: column;
   align-items: center;
   text-align: center;
-}
-
-.badge-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0;
-  background: none;
-  border: none;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: #a78bfa;
-  margin-bottom: 16px;
-  letter-spacing: 0.01em;
 }
 
 .hero-title {
@@ -858,6 +845,16 @@ body {
 
 /* Responsive */
 @media (max-width: 720px) {
+  .navbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .badge-pill {
+    font-size: 0.75rem;
+    padding: 6px 12px;
+    white-space: normal;
+  }
   .hero-title {
     font-size: 2.2rem;
   }

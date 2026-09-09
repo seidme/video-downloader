@@ -101,7 +101,7 @@ async function fetchVideoInfo(url) {
   hideAlert();
   resultCard.style.display = 'none';
   progressSection.style.display = 'none';
-  
+
   fetchBtn.disabled = true;
   fetchSpinner.style.display = 'inline-block';
   document.querySelector('.btn-text').textContent = 'Analyzing...';
@@ -248,17 +248,6 @@ async function startDownload() {
       throw new Error(data.error || 'Failed to start download.');
     }
 
-    // If download is queued due to 3 active downloads limit
-    if (data.queued) {
-      progressStatusText.textContent = `In queue (position #${data.queuePosition || 1}) — waiting for active slot (Max 3 downloads)...`;
-      progressBarFill.style.width = '12%';
-      progressPercentText.textContent = 'Queued';
-      progressSpeed.textContent = 'Waiting';
-      progressEta.textContent = 'In line';
-      pollJobProgress(data.jobId);
-      return;
-    }
-
     // If download is already in progress, seamlessly attach to it!
     if (data.inProgress) {
       progressStatusText.textContent = 'Attaching to download in progress...';
@@ -315,15 +304,6 @@ function pollJobProgress(jobId) {
       }
 
       const job = await res.json();
-
-      if (job.status === 'queued') {
-        progressStatusText.textContent = `In queue (position #${job.queuePosition || 1}) — waiting for slot (Max 3 active)...`;
-        progressBarFill.style.width = '15%';
-        progressPercentText.textContent = 'Queued';
-        progressSpeed.textContent = 'Waiting';
-        progressEta.textContent = 'In line';
-        return;
-      }
 
       // Update UI
       const percent = Math.round(job.percent || 0);
