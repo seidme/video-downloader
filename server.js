@@ -392,6 +392,26 @@ app.post('/api/bypass/verify', (req, res) => {
   return res.status(401).json({ valid: false, error: 'Incorrect password. Hint: slija' });
 });
 
+// POST /api/admin/cookies - Securely upload or update cookie files
+app.post('/api/admin/cookies', (req, res) => {
+  const { password, cookies, filename } = req.body || {};
+  if (password !== BYPASS_PASSWORD) {
+    return res.status(403).json({ error: 'Unauthorized' });
+  }
+  if (!cookies || typeof cookies !== 'string' || cookies.trim().length === 0) {
+    return res.status(400).json({ error: 'No cookie content provided.' });
+  }
+  const cleanName = (filename && /^[a-zA-Z0-9_-]+\.txt$/.test(filename)) ? filename : 'account.txt';
+  const targetPath = path.join(COOKIES_DIR, cleanName);
+  try {
+    fs.writeFileSync(targetPath, cookies.trim() + '\n', 'utf-8');
+    console.log(`🍪 Admin updated cookie file: ${cleanName}`);
+    return res.json({ success: true, filename: cleanName, activeCookies: getAvailableCookieFiles().length });
+  } catch (err) {
+    return res.status(500).json({ error: `Failed to write cookies: ${err.message}` });
+  }
+});
+
 // GET /api/stats - Server health, history file counts, sizes, biggest file, and audit logs
 app.get('/api/stats', (req, res) => {
   const { totalBytes, details } = getStorageUsage();
