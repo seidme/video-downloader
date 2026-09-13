@@ -5,6 +5,13 @@ services:
     restart: always
     volumes:
       - ./data:/app/data
+    cpus: 0.50
+    mem_limit: 500m
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 500M
     # Ports are not exposed externally. Nginx reverse-proxy routes traffic to this container on port 3000.
     networks:
       - public-network

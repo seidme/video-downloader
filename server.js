@@ -47,7 +47,19 @@ const AUDIT_FILE = path.join(DATA_DIR, 'audit.json');
 const MAX_STORAGE_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB max hard limit
 const PURGE_THRESHOLD_BYTES = MAX_STORAGE_BYTES * 0.6; // Start purging at 60% (1.2 GB)
 const MAX_FILE_SIZE_BYTES = 1024 * 1024 * 1024; // 1 GB
+const MAX_CONCURRENT_DOWNLOADS = 3; // Maximum active downloads allowed concurrently
 const BYPASS_PASSWORD = 'leptir';
+
+// Helper: Count currently active downloading or processing jobs
+function getActiveDownloadCount() {
+  let count = 0;
+  for (const job of jobs.values()) {
+    if (job.status === 'downloading' || job.status === 'processing') {
+      count++;
+    }
+  }
+  return count;
+}
 
 // Audit Action Enum & Categorization
 const AuditAction = Object.freeze({
@@ -349,7 +361,8 @@ app.get('/api/health', (req, res) => {
       status: code === 0 ? 'online' : 'error',
       ytdlp: code === 0 ? ytVer.trim() : 'missing',
       ffmpegLocation: FFMPEG_BIN,
-      activeJobs: jobs.size,
+      activeJobs: getActiveDownloadCount(),
+      maxConcurrentDownloads: MAX_CONCURRENT_DOWNLOADS,
       storage: {
         usedBytes: totalBytes,
         usedMB: (totalBytes / (1024 * 1024)).toFixed(2),
@@ -431,7 +444,8 @@ app.get('/api/stats', (req, res) => {
       purgeThresholdMB: (PURGE_THRESHOLD_BYTES / (1024 * 1024)).toFixed(0),
       usagePercent: ((totalBytes / MAX_STORAGE_BYTES) * 100).toFixed(1)
     },
-    activeJobs: jobs.size,
+    activeJobs: getActiveDownloadCount(),
+    maxConcurrentDownloads: MAX_CONCURRENT_DOWNLOADS,
     cookies: {
       count: getAvailableCookieFiles().length
     },
@@ -667,7 +681,23 @@ app.post('/api/download/start', (req, res) => {
     });
   }
 
-  // 3. Otherwise, start fresh download
+  // 3. Concurrency limit check: Reject if 3 active downloads are already running
+  const activeDownloads = getActiveDownloadCount();
+  if (activeDownloads >= MAX_CONCURRENT_DOWNLOADS) {
+    logAuditEvent(AuditAction.DOWNLOAD_ERROR, {
+      url,
+      type,
+      quality: qTag,
+      title: safeTitle,
+      details: `Server busy: Maximum concurrent downloads reached (${activeDownloads}/${MAX_CONCURRENT_DOWNLOADS})`
+    }, req);
+    return res.status(503).json({
+      error: 'Server is currently busy processing other downloads. Maximum 3 concurrent downloads reached. Please try again in a few moments.',
+      busy: true
+    });
+  }
+
+  // 4. Otherwise, start fresh download
   const quota = ensureStorageQuota();
   if (!quota.ok) {
     logAuditEvent(AuditAction.DOWNLOAD_ERROR, { url, details: 'Storage limit reached (2 GB max)' }, req);
