@@ -20,8 +20,8 @@ RUN npm install --omit=dev
 # Copy application source
 COPY . .
 
-# Ensure downloads directory exists
-RUN mkdir -p /app/downloads
+# Ensure data directory exists
+RUN mkdir -p /app/data /app/data/downloads /app/data/cookies
 
 EXPOSE 3000
 

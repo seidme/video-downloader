@@ -6,6 +6,8 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 
+import { exportMultipleGuestCookies } from './export-cookies.js';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -28,6 +30,19 @@ const AUDIT_FILE = path.join(DATA_DIR, 'audit.json');
 [DATA_DIR, DOWNLOADS_DIR, COOKIES_DIR].forEach(dir => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
+
+// Auto-seed incognito guest cookies if none exist on startup
+(async function initCookies() {
+  try {
+    const existing = fs.readdirSync(COOKIES_DIR).filter(f => f.endsWith('.txt'));
+    if (existing.length === 0) {
+      console.log('🍪 No cookies found in cookies directory. Auto-generating guest cookies pool...');
+      await exportMultipleGuestCookies(3, COOKIES_DIR);
+    }
+  } catch (err) {
+    console.warn('⚠️ Auto-cookie initialization notice:', err.message);
+  }
+})();
 
 const MAX_STORAGE_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB max hard limit
 const PURGE_THRESHOLD_BYTES = MAX_STORAGE_BYTES * 0.6; // Start purging at 60% (1.2 GB)
@@ -417,6 +432,9 @@ app.get('/api/stats', (req, res) => {
       usagePercent: ((totalBytes / MAX_STORAGE_BYTES) * 100).toFixed(1)
     },
     activeJobs: jobs.size,
+    cookies: {
+      count: getAvailableCookieFiles().length
+    },
     audit: {
       totalCount: targetLogs.length,
       recentLogs: targetLogs.slice(0, limit)
