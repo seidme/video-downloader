@@ -503,7 +503,7 @@ app.post('/api/info', async (req, res) => {
   const env = { ...process.env, PATH: `/opt/homebrew/bin:/usr/local/bin:${process.env.PATH}` };
   const child = spawn(YTDLP_BIN, args, { env });
 
-  const infoTimeout = setTimeout(() => { child.kill(); }, 30 * 1000);
+  const infoTimeout = setTimeout(() => { child.kill(); }, 60 * 1000);
 
   let stdout = '';
   let stderr = '';
