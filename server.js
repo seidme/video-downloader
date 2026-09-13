@@ -281,7 +281,10 @@ function getAvailableCookieFiles() {
     } catch (e) {}
   }
 
-  return Array.from(found);
+  const all = Array.from(found);
+  // Prioritize authenticated account cookies over anonymous guest cookies
+  const accountCookies = all.filter(f => !path.basename(f).startsWith('cookies_'));
+  return accountCookies.length > 0 ? accountCookies : all;
 }
 
 // Helper: Pick a random cookie file from the available pool
@@ -294,6 +297,9 @@ function getRandomCookieFile() {
 // Helper: Common yt-dlp arguments (cookies, optional proxy, optional player client)
 function getYtDlpCommonArgs() {
   const common = [];
+
+  // Enable Node.js runtime for solving YouTube JS challenges (n-sig)
+  common.push('--js-runtimes', 'node');
 
   const cookiePath = getRandomCookieFile();
   if (cookiePath) {
