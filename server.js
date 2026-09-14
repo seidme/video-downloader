@@ -628,25 +628,44 @@ app.post('/api/download/start', (req, res) => {
   }
 
   const isVideo = type !== 'audio';
-  const durationOver1h = typeof duration === 'number' && duration > 3600;
+  const durationNum = typeof duration === 'number' ? duration : parseFloat(duration);
+  const durationOver20m = !isNaN(durationNum) && durationNum > 1200; // > 20 minutes
+  const durationOver3h = !isNaN(durationNum) && durationNum > 10800; // > 3 hours
   const isBypassed = bypassPassword === BYPASS_PASSWORD;
+  const safeTitle = sanitizeFilename(title);
 
-  if (isVideo && durationOver1h && !isBypassed) {
+  // Rule 1: Any media > 3 hours requires bypass password
+  if (durationOver3h && !isBypassed) {
     logAuditEvent(AuditAction.RESTRICTION_BLOCKED, {
       url,
       type,
-      duration,
+      duration: durationNum,
       title: safeTitle,
-      details: 'Video exceeds 1 hour limit without password'
+      details: 'Media exceeds 3 hours limit without password'
     }, req);
     return res.status(403).json({
-      error: 'Videos longer than 1 hour require bypass password (Hint: slija).',
+      error: 'Media longer than 3 hours requires bypass password (Hint: slija).',
       restricted: true,
       hint: 'slija'
     });
   }
 
-  const safeTitle = sanitizeFilename(title);
+  // Rule 2: Video > 20 minutes requires bypass password (audio is allowed freely up to 3h)
+  if (isVideo && durationOver20m && !isBypassed) {
+    logAuditEvent(AuditAction.RESTRICTION_BLOCKED, {
+      url,
+      type,
+      duration: durationNum,
+      title: safeTitle,
+      details: 'Video exceeds 20 minutes limit without password (audio allowed)'
+    }, req);
+    return res.status(403).json({
+      error: 'Videos longer than 20 minutes require bypass password (Hint: slija). Audio downloads are allowed freely.',
+      restricted: true,
+      hint: 'slija'
+    });
+  }
+
   const ext = type === 'audio' ? (quality === 'm4a' ? 'm4a' : 'mp3') : 'mp4';
   const urlHash = getUrlHash(url);
   const qTag = quality || (type === 'audio' ? '320k' : 'best');

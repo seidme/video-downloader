@@ -300,32 +300,38 @@ function switchMode(mode) {
   checkRestrictionState();
 }
 
-// Check and handle restrictions (Max 1h video, 1GB file, audio is allowed)
+// Check and handle restrictions (>20 mins video locked; audio freely allowed up to 3h; >3h locked)
 function checkRestrictionState() {
   if (!currentMedia) return;
 
   const isVideo = currentMode === 'video';
-  const durationOver1h = (currentMedia.duration || 0) > 3600;
+  const duration = typeof currentMedia.duration === 'number' ? currentMedia.duration : parseFloat(currentMedia.duration || 0);
+  const durationOver20m = duration > 1200;  // 20 minutes
+  const durationOver3h = duration > 10800;  // 3 hours
   const sizeOver1gb = (currentMedia.filesize || 0) > 1024 * 1024 * 1024 || !!currentMedia.isSizeRestricted;
 
-  // Video duration over 1h only applies if video mode (audio is allowed)
-  // File size over 1GB applies in general
-  const isRestricted = (isVideo && durationOver1h) || sizeOver1gb;
+  // Rules:
+  // 1. >3h: All media (video & audio) locked without password
+  // 2. >20m: Video locked without password (audio is freely allowed)
+  // 3. >1GB: All media locked without password
+  let isRestricted = false;
+  let reason = '';
+
+  if (durationOver3h) {
+    isRestricted = true;
+    reason = 'This media is longer than 3 hours. Both video and audio downloads require password.';
+  } else if (isVideo && durationOver20m) {
+    isRestricted = true;
+    reason = 'Videos longer than 20 minutes require password (audio downloads are allowed freely).';
+  } else if (sizeOver1gb) {
+    isRestricted = true;
+    reason = 'This file exceeds the 1 GB file size limit.';
+  }
 
   if (isRestricted && !isBypassed) {
     if (restrictionBox) {
       restrictionBox.style.display = 'block';
       restrictionBox.classList.remove('unlocked');
-      
-      let reason = '';
-      if (isVideo && durationOver1h && sizeOver1gb) {
-        reason = 'This video is longer than 1 hour and exceeds 1 GB file size.';
-      } else if (isVideo && durationOver1h) {
-        reason = 'This video is longer than 1 hour (max 1h for video; audio is allowed).';
-      } else if (sizeOver1gb) {
-        reason = 'This file exceeds the 1 GB file size limit.';
-      }
-
       restrictionTitle.textContent = 'Download Restriction';
       restrictionDesc.textContent = `${reason} Enter password to bypass restriction.`;
     }
@@ -440,9 +446,11 @@ async function startDownload() {
   if (!currentMedia) return;
 
   const isVideo = currentMode === 'video';
-  const durationOver1h = (currentMedia.duration || 0) > 3600;
+  const duration = typeof currentMedia.duration === 'number' ? currentMedia.duration : parseFloat(currentMedia.duration || 0);
+  const durationOver20m = duration > 1200;
+  const durationOver3h = duration > 10800;
   const sizeOver1gb = (currentMedia.filesize || 0) > 1024 * 1024 * 1024 || !!currentMedia.isSizeRestricted;
-  const isRestricted = (isVideo && durationOver1h) || sizeOver1gb;
+  const isRestricted = durationOver3h || (isVideo && durationOver20m) || sizeOver1gb;
 
   if (isRestricted && !isBypassed) {
     checkRestrictionState();
