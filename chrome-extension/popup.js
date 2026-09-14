@@ -1,10 +1,10 @@
-// Video Downloader - Chrome Extension Controller (Manifest V3)
-
-const DEFAULT_SERVER_URL = 'https://video.codeeve.com';
+const LOCAL_SERVER_URL = 'http://127.0.0.1:3000';
+const DEFAULT_CLOUD_URL = 'https://video.codeeve.com';
 const DEFAULT_PASSWORD = 'slija';
 
 let state = {
-  serverUrl: DEFAULT_SERVER_URL,
+  serverUrl: DEFAULT_CLOUD_URL,
+  savedServerUrl: null,
   bypassPassword: DEFAULT_PASSWORD,
   autoToken: true,
   currentTab: null,
@@ -74,11 +74,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function loadSettings() {
   return new Promise((resolve) => {
     chrome.storage.local.get(['serverUrl', 'bypassPassword', 'autoToken'], (items) => {
-      state.serverUrl = (items.serverUrl || DEFAULT_SERVER_URL).replace(/\/+$/, '');
+      state.savedServerUrl = items.serverUrl ? items.serverUrl.replace(/\/+$/, '') : null;
+      state.serverUrl = state.savedServerUrl || DEFAULT_CLOUD_URL;
       state.bypassPassword = items.bypassPassword !== undefined ? items.bypassPassword : DEFAULT_PASSWORD;
       state.autoToken = items.autoToken !== undefined ? items.autoToken : true;
 
-      el.settingServerUrl.value = state.serverUrl;
+      el.settingServerUrl.value = state.savedServerUrl || DEFAULT_CLOUD_URL;
       el.settingPassword.value = state.bypassPassword;
       el.settingAutoToken.checked = state.autoToken;
       resolve();
@@ -240,22 +241,40 @@ async function extractYouTubeSession(tabId) {
   }
 }
 
-// Check if Downloader Server is online
+// Check if Downloader Server is online (Auto-detect Local vs Cloud)
 async function checkServerHealth() {
+  // 1. If user didn't force a custom cloud URL, prioritize local instance (127.0.0.1:3000)
   try {
-    const res = await fetch(`${state.serverUrl}/api/health`, { method: 'GET', signal: AbortSignal.timeout(3500) });
-    if (res.ok) {
+    const localRes = await fetch(`${LOCAL_SERVER_URL}/api/health`, { method: 'GET', signal: AbortSignal.timeout(600) });
+    if (localRes.ok) {
+      state.serverUrl = LOCAL_SERVER_URL;
       el.statusPill.className = 'status-pill online';
-      el.statusText.textContent = 'Online';
-      el.statusPill.title = `Connected to ${state.serverUrl}`;
+      el.statusText.textContent = 'Local (3000)';
+      el.statusPill.title = 'Running locally on your machine (100% private - zero server contact)';
+      return true;
+    }
+  } catch (err) {
+    // Local instance not running, proceed to fallback
+  }
+
+  // 2. Fallback to configured cloud server
+  const targetCloud = state.savedServerUrl || DEFAULT_CLOUD_URL;
+  try {
+    const res = await fetch(`${targetCloud}/api/health`, { method: 'GET', signal: AbortSignal.timeout(3500) });
+    if (res.ok) {
+      state.serverUrl = targetCloud;
+      el.statusPill.className = 'status-pill online';
+      el.statusText.textContent = 'Cloud';
+      el.statusPill.title = `Connected to server: ${targetCloud}`;
       return true;
     }
   } catch (err) {
     // Offline
   }
+
   el.statusPill.className = 'status-pill offline';
   el.statusText.textContent = 'Offline';
-  el.statusPill.title = `Cannot reach ${state.serverUrl}`;
+  el.statusPill.title = `Cannot reach local (${LOCAL_SERVER_URL}) or cloud (${targetCloud})`;
   return false;
 }
 
@@ -422,7 +441,7 @@ async function testConnection() {
 }
 
 async function saveSettings() {
-  const newUrl = el.settingServerUrl.value.trim().replace(/\/+$/, '') || DEFAULT_SERVER_URL;
+  const newUrl = el.settingServerUrl.value.trim().replace(/\/+$/, '') || DEFAULT_CLOUD_URL;
   const newPassword = el.settingPassword.value.trim();
   const newAutoToken = el.settingAutoToken.checked;
 
@@ -431,6 +450,7 @@ async function saveSettings() {
     bypassPassword: newPassword,
     autoToken: newAutoToken
   }, () => {
+    state.savedServerUrl = newUrl;
     state.serverUrl = newUrl;
     state.bypassPassword = newPassword;
     state.autoToken = newAutoToken;

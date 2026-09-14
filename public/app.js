@@ -816,9 +816,10 @@ const tabBookmarkletContent = document.getElementById('tabBookmarkletContent');
 const tabExtensionContent = document.getElementById('tabExtensionContent');
 const bookmarkletLink = document.getElementById('bookmarkletLink');
 
-// Bookmarklet code: strictly targets local instance 127.0.0.1:3000 (never communicates with external server)
+// Smart Bookmarklet code: auto-detects local engine with cloud fallback
 if (bookmarkletLink) {
-  bookmarkletLink.href = `javascript:(function(){var u=encodeURIComponent(window.location.href);window.open('http://127.0.0.1:3000/?url='+u,'_blank');})();`;
+  const bCode = `javascript:(function(){var u=encodeURIComponent(window.location.href);var to=setTimeout(function(){window.open('https://video.codeeve.com/?url='+u,'_blank');},350);try{fetch('http://127.0.0.1:3000/api/health',{mode:'no-cors'}).then(function(){clearTimeout(to);window.open('http://127.0.0.1:3000/?url='+u,'_blank');}).catch(function(){clearTimeout(to);window.open('https://video.codeeve.com/?url='+u,'_blank');});}catch(e){clearTimeout(to);window.open('https://video.codeeve.com/?url='+u,'_blank');}})();`;
+  bookmarkletLink.href = bCode;
 }
 
 // Check if Chrome extension is installed and active
@@ -877,14 +878,32 @@ if (tabBookmarkletBtn && tabExtensionBtn && tabBookmarkletContent && tabExtensio
 }
 
 // ----------------------------------------------------
-// Incoming ?url= Parameter Auto-Inspection
+// Incoming ?url= Parameter Auto-Inspection & Local Engine Handoff
 // ----------------------------------------------------
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   try {
     const urlParams = new URLSearchParams(window.location.search);
     const targetUrl = urlParams.get('url');
+    const forceCloud = urlParams.get('forceCloud');
+
     if (targetUrl && videoUrlInput) {
       videoUrlInput.value = targetUrl;
+
+      // If on cloud server, check if user's local instance is running
+      // If running, automatically hand off to 127.0.0.1:3000
+      if (window.location.hostname !== '127.0.0.1' && window.location.hostname !== 'localhost' && !forceCloud) {
+        try {
+          const localCheck = await fetch('http://127.0.0.1:3000/api/health', { signal: AbortSignal.timeout(500) });
+          if (localCheck.ok) {
+            console.log('⚡ Local engine active. Redirecting download to 127.0.0.1:3000...');
+            window.location.href = `http://127.0.0.1:3000/?url=${encodeURIComponent(targetUrl)}`;
+            return;
+          }
+        } catch (e) {
+          // Local engine offline, proceed with cloud download
+        }
+      }
+
       setTimeout(() => {
         fetchVideoInfo(targetUrl);
       }, 300);
