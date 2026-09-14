@@ -76,7 +76,7 @@ Runs 100% on your machine with zero external dependencies.
 3. Your browser will open to: http://127.0.0.1:3000
 
 ## Notes:
-- Fully portable: includes bundled Node.js, yt-dlp, and ffmpeg.
+- Fully portable: includes bundled Node.js and dependencies.
 - Downloads are saved to the `downloads/` folder inside this directory.
 EOF
 
