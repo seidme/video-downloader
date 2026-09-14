@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Video Downloader
+Comment=Run Video Downloader locally in your browser
+Exec=bash -c 'cd "$(dirname "%k")" && ./start.sh'
+Icon=video-x-generic
+Terminal=true
+Categories=AudioVideo;Network;

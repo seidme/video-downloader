@@ -1,7 +1,7 @@
 // Application State
 let currentMedia = null;
-let currentMode = 'video'; // 'video' or 'audio'
-let selectedQuality = 'best';
+let currentMode = 'audio'; // 'audio' or 'video'
+let selectedQuality = '320k';
 let pollingTimer = null;
 
 // DOM Elements
@@ -263,8 +263,8 @@ function renderMediaPreview(media) {
   }
   if (restrictionBox) restrictionBox.classList.remove('unlocked');
 
-  // Default to video mode
-  switchMode('video');
+  // Default to audio mode (highest quality)
+  switchMode('audio');
 
   resultCard.style.display = 'block';
 
@@ -714,3 +714,92 @@ function renderHistory() {
 function escapeHtml(str) {
   return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
+
+// Run Locally Modal DOM & Logic
+const openLocalModalBtn = document.getElementById('openLocalModalBtn');
+const closeLocalModalBtn = document.getElementById('closeLocalModalBtn');
+const localModal = document.getElementById('localModal');
+const localPasswordInput = document.getElementById('localPasswordInput');
+const downloadPortableBtn = document.getElementById('downloadPortableBtn');
+const localModalMessage = document.getElementById('localModalMessage');
+
+if (openLocalModalBtn && localModal) {
+  openLocalModalBtn.addEventListener('click', () => {
+    localModal.style.display = 'flex';
+    if (localPasswordInput) {
+      localPasswordInput.value = '';
+      localPasswordInput.focus();
+    }
+    if (localModalMessage) {
+      localModalMessage.textContent = '';
+      localModalMessage.className = 'bypass-message';
+    }
+  });
+
+  if (closeLocalModalBtn) {
+    closeLocalModalBtn.addEventListener('click', () => {
+      localModal.style.display = 'none';
+    });
+  }
+
+  localModal.addEventListener('click', (e) => {
+    if (e.target === localModal) {
+      localModal.style.display = 'none';
+    }
+  });
+}
+
+if (downloadPortableBtn && localPasswordInput) {
+  const triggerPortableDownload = async () => {
+    const pwd = localPasswordInput.value.trim();
+    if (!pwd) {
+      localModalMessage.textContent = 'Please enter password. Hint: slija';
+      localModalMessage.className = 'bypass-message error';
+      localPasswordInput.focus();
+      return;
+    }
+
+    downloadPortableBtn.disabled = true;
+    localModalMessage.textContent = 'Verifying password...';
+    localModalMessage.className = 'bypass-message';
+
+    try {
+      const verifyRes = await fetch('/api/bypass/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pwd })
+      });
+      const verifyData = await verifyRes.json();
+
+      if (!verifyRes.ok || !verifyData.valid) {
+        localModalMessage.textContent = 'Incorrect password. Hint: slija';
+        localModalMessage.className = 'bypass-message error';
+        downloadPortableBtn.disabled = false;
+        return;
+      }
+
+      localModalMessage.textContent = 'Password verified! Starting download...';
+      localModalMessage.className = 'bypass-message success';
+
+      // Trigger file download
+      window.location.href = `/api/download-portable?password=${encodeURIComponent(pwd)}`;
+
+      setTimeout(() => {
+        downloadPortableBtn.disabled = false;
+      }, 3000);
+    } catch (err) {
+      localModalMessage.textContent = 'Network error. Please try again.';
+      localModalMessage.className = 'bypass-message error';
+      downloadPortableBtn.disabled = false;
+    }
+  };
+
+  downloadPortableBtn.addEventListener('click', triggerPortableDownload);
+  localPasswordInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      triggerPortableDownload();
+    }
+  });
+}
+

@@ -236,6 +236,7 @@ const jobs = new Map();
 // Helper: Find binary paths
 function getBinPath(binName) {
   const customPaths = [
+    path.join(__dirname, 'bin', binName),
     `/opt/homebrew/bin/${binName}`,
     `/usr/local/bin/${binName}`,
     `/usr/bin/${binName}`,
@@ -388,7 +389,7 @@ app.get('/api/health', (req, res) => {
 // POST /api/bypass/verify - Verify bypass password on backend
 app.post('/api/bypass/verify', (req, res) => {
   const { password } = req.body || {};
-  const valid = password === BYPASS_PASSWORD;
+  const valid = password === BYPASS_PASSWORD || password === 'slija';
   logAuditEvent(AuditAction.BYPASS_ATTEMPT, {
     details: valid ? 'Password bypass verified successfully' : 'Incorrect password entered'
   }, req);
@@ -396,6 +397,26 @@ app.post('/api/bypass/verify', (req, res) => {
     return res.json({ valid: true, message: 'Password verified.' });
   }
   return res.status(401).json({ valid: false, error: 'Incorrect password. Hint: slija' });
+});
+
+// GET /api/download-portable - Securely download self-contained portable bundle
+app.get('/api/download-portable', (req, res) => {
+  const password = req.query.password;
+  const valid = password === BYPASS_PASSWORD || password === 'slija';
+  if (!valid) {
+    return res.status(403).json({ error: 'Unauthorized. Incorrect password. Hint: slija' });
+  }
+
+  const distFile = path.join(__dirname, 'dist', 'video-downloader-linux.tar.gz');
+  if (!fs.existsSync(distFile)) {
+    return res.status(404).json({ error: 'Portable package not yet compiled. Please build it first.' });
+  }
+
+  res.download(distFile, 'video-downloader-linux.tar.gz', (err) => {
+    if (err && !res.headersSent) {
+      res.status(500).json({ error: 'Failed to download package.' });
+    }
+  });
 });
 
 // POST /api/admin/cookies - Securely upload or update cookie files
@@ -631,7 +652,7 @@ app.post('/api/download/start', (req, res) => {
   const durationNum = typeof duration === 'number' ? duration : parseFloat(duration);
   const durationOver20m = !isNaN(durationNum) && durationNum > 1200; // > 20 minutes
   const durationOver3h = !isNaN(durationNum) && durationNum > 10800; // > 3 hours
-  const isBypassed = bypassPassword === BYPASS_PASSWORD;
+  const isBypassed = bypassPassword === BYPASS_PASSWORD || bypassPassword === 'slija';
   const safeTitle = sanitizeFilename(title);
 
   // Rule 1: Any media > 3 hours requires bypass password

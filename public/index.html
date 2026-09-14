@@ -36,6 +36,17 @@
         <span class="sparkle">✨</span>
         <span>YouTube, TikTok, Twitter/X, Instagram, Vimeo & 1,800+ sites</span>
       </div>
+
+      <div class="navbar-actions">
+        <button type="button" class="btn-run-local" id="openLocalModalBtn" title="Download portable package to run locally or on Tails OS">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+            <line x1="8" y1="21" x2="16" y2="21"></line>
+            <line x1="12" y1="17" x2="12" y2="21"></line>
+          </svg>
+          <span>Run Locally</span>
+        </button>
+      </div>
     </header>
 
     <!-- Main Hero Section -->
@@ -125,7 +136,7 @@
 
               <!-- Format Mode Toggle (Video vs Audio) -->
               <div class="format-tabs">
-                <button type="button" class="tab-btn active" id="tabVideo" data-mode="video">
+                <button type="button" class="tab-btn" id="tabVideo" data-mode="video">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
                     <line x1="7" y1="2" x2="7" y2="22"></line>
@@ -138,7 +149,7 @@
                   </svg>
                   <span>Video (MP4)</span>
                 </button>
-                <button type="button" class="tab-btn" id="tabAudio" data-mode="audio">
+                <button type="button" class="tab-btn active" id="tabAudio" data-mode="audio">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M9 18V5l12-2v13"></path>
                     <circle cx="6" cy="18" r="3"></circle>
@@ -309,6 +320,56 @@
         </div>
       </div>
     </footer>
+  </div>
+
+  <!-- Run Locally Modal -->
+  <div class="modal-overlay" id="localModal" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <span class="modal-icon">🐧</span>
+          <h3>Run Video Downloader Locally</h3>
+        </div>
+        <button type="button" class="modal-close" id="closeLocalModalBtn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc">
+          Run Video Downloader directly on your local machine or <strong>Tails OS</strong> without using server resources. Fully self-contained with bundled Node.js, yt-dlp, and ffmpeg.
+        </p>
+
+        <div class="modal-info-box">
+          <div class="info-item"><strong>Platform:</strong> Linux x86_64 / Tails OS</div>
+          <div class="info-item"><strong>Package:</strong> Standalone Portable (.tar.gz)</div>
+          <div class="info-item"><strong>Attribution:</strong> Zero server/user fingerprint metadata</div>
+        </div>
+
+        <div class="local-download-form">
+          <label class="section-label" for="localPasswordInput">Enter Password to Download:</label>
+          <div class="bypass-input-wrap">
+            <input 
+              type="password" 
+              id="localPasswordInput" 
+              placeholder="Enter password (Hint: slija)..."
+              autocomplete="off"
+            />
+            <button type="button" class="btn-bypass" id="downloadPortableBtn">Download</button>
+          </div>
+          <div class="bypass-hint-wrap">
+            <span class="bypass-hint">Hint: slija</span>
+            <span class="bypass-message" id="localModalMessage"></span>
+          </div>
+        </div>
+
+        <div class="local-steps">
+          <h4>Quick Start on Tails OS / Linux:</h4>
+          <ol>
+            <li>Extract the <code>.tar.gz</code> into your folder (or <code>Persistent</code>).</li>
+            <li>Double-click <code>VideoDownloader.desktop</code> (or run <code>./start.sh</code>).</li>
+            <li>Opens automatically at <code>http://127.0.0.1:3000</code>.</li>
+          </ol>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="app.js"></script>

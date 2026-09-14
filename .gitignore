@@ -7,6 +7,8 @@ yarn-error.log*
 # Downloaded files & temporary storage
 data/
 downloads/
+dist/
+bin/
 temp/
 *.mp4
 *.m4a
