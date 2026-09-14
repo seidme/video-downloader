@@ -5,6 +5,7 @@ services:
     restart: always
     volumes:
       - ./data:/app/data
+      - ./dist:/app/dist
     cpus: 0.50
     mem_limit: 500m
     deploy:
