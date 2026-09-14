@@ -5,11 +5,10 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-BUILD_DIR="/tmp/video-downloader-portable-build"
+BUILD_DIR="$(mktemp -d)"
 DIST_DIR="$ROOT_DIR/dist"
 
-echo "🔨 Preparing portable build directory..."
-rm -rf "$BUILD_DIR"
+echo "🔨 Preparing portable build directory in $BUILD_DIR..."
 mkdir -p "$BUILD_DIR/video-downloader/bin"
 mkdir -p "$BUILD_DIR/video-downloader/data/cookies"
 mkdir -p "$BUILD_DIR/video-downloader/downloads"
@@ -54,13 +53,13 @@ cp "$ROOT_DIR/VideoDownloader.desktop" ./
 chmod +x start.sh VideoDownloader.desktop
 
 # 5. Install minimal production dependencies
-echo "📦 Installing clean production node_modules..."
-if command -v npm >/dev/null 2>&1; then
-  npm install --omit=dev --no-audit --no-fund
-elif command -v docker >/dev/null 2>&1; then
-  docker run --rm -v "$(pwd):/app" -w /app node:22-alpine npm install --omit=dev --no-audit --no-fund
-elif [ -d "$ROOT_DIR/node_modules" ]; then
+echo "📦 Copying production node_modules..."
+if [ -d "$ROOT_DIR/node_modules" ]; then
   cp -r "$ROOT_DIR/node_modules" ./
+elif docker ps --format '{{.Names}}' 2>/dev/null | grep -q "video-downloader-app"; then
+  docker cp video-downloader-app:/app/node_modules ./
+elif command -v npm >/dev/null 2>&1; then
+  npm install --omit=dev --no-audit --no-fund
 fi
 
 # 6. Add clean README with Tails instructions
