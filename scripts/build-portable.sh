@@ -55,7 +55,13 @@ chmod +x start.sh VideoDownloader.desktop
 
 # 5. Install minimal production dependencies
 echo "📦 Installing clean production node_modules..."
-npm install --omit=dev --no-audit --no-fund
+if command -v npm >/dev/null 2>&1; then
+  npm install --omit=dev --no-audit --no-fund
+elif command -v docker >/dev/null 2>&1; then
+  docker run --rm -v "$(pwd):/app" -w /app node:22-alpine npm install --omit=dev --no-audit --no-fund
+elif [ -d "$ROOT_DIR/node_modules" ]; then
+  cp -r "$ROOT_DIR/node_modules" ./
+fi
 
 # 6. Add clean README with Tails instructions
 cat << 'EOF' > README-LOCAL.md
