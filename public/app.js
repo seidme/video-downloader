@@ -816,10 +816,9 @@ const tabBookmarkletContent = document.getElementById('tabBookmarkletContent');
 const tabExtensionContent = document.getElementById('tabExtensionContent');
 const bookmarkletLink = document.getElementById('bookmarkletLink');
 
-// Dynamic Bookmarklet code pointing to current origin
+// Bookmarklet code: strictly targets local instance 127.0.0.1:3000 (never communicates with external server)
 if (bookmarkletLink) {
-  const currentOrigin = window.location.origin;
-  bookmarkletLink.href = `javascript:(function(){var u=encodeURIComponent(window.location.href);window.open('${currentOrigin}/?url='+u,'_blank');})();`;
+  bookmarkletLink.href = `javascript:(function(){var u=encodeURIComponent(window.location.href);window.open('http://127.0.0.1:3000/?url='+u,'_blank');})();`;
 }
 
 // Check if Chrome extension is installed and active

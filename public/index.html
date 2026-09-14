@@ -395,12 +395,12 @@
         <!-- Tab 1: Bookmarklet -->
         <div class="ext-tab-content" id="tabBookmarkletContent">
           <p class="modal-desc">
-            <strong>Zero installation needed!</strong> Drag the button below to your browser's Bookmarks/Favorites bar. Whenever you are on YouTube, Twitter, Instagram, or Reddit, simply click the bookmark to instantly download the media.
+            <strong>100% Private &amp; Local:</strong> This bookmarklet sends media URLs directly to your local application running on <code>http://127.0.0.1:3000</code>. It never communicates with or touches any external server.
           </p>
 
           <div class="bookmarklet-drag-box">
             <a href="#" class="bookmarklet-btn" id="bookmarkletLink" title="Drag me to your Bookmarks Bar">
-              ⬇️ Download Media
+              ⬇️ Download Locally (127.0.0.1)
             </a>
             <p class="bookmarklet-drag-hint">⬆️ Drag this button directly to your browser's Bookmarks bar</p>
           </div>
@@ -409,8 +409,9 @@
             <h4>How it works:</h4>
             <ol>
               <li>Make sure your browser bookmarks bar is visible (<code>Ctrl+Shift+B</code> or <code>Cmd+Shift+B</code>).</li>
-              <li>Drag the <strong>"⬇️ Download Media"</strong> button above into your bookmarks bar.</li>
-              <li>Go to any video on YouTube, Reddit, Instagram, or Twitter and click that bookmark!</li>
+              <li>Drag the <strong>"⬇️ Download Locally (127.0.0.1)"</strong> button above into your bookmarks bar.</li>
+              <li>With your local app running (<code>./start.sh</code>), visit any video on YouTube, Reddit, or Twitter and click the bookmark!</li>
+              <li>It opens your local <code>http://127.0.0.1:3000</code> and begins downloading directly on your machine.</li>
             </ol>
           </div>
         </div>
