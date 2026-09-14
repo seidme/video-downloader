@@ -1,6 +1,6 @@
 #!/bin/bash
 # scripts/build-portable.sh
-# Build a zero-attribution, self-contained portable package for Linux / Tails OS.
+# Build a zero-attribution, self-contained portable package for Linux.
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -62,21 +62,21 @@ elif command -v npm >/dev/null 2>&1; then
   npm install --omit=dev --no-audit --no-fund
 fi
 
-# 6. Add clean README with Tails instructions
+# 6. Add clean README with Linux instructions
 cat << 'EOF' > README-LOCAL.md
 # Video Downloader (Portable)
 
 A self-contained, local video and audio downloader.
-Runs 100% on your machine (offline or over Tor in Tails OS).
+Runs 100% on your machine with zero external dependencies.
 
-## Quick Start on Tails OS / Linux:
+## Quick Start on Linux:
 
-1. Extract this folder (e.g. into your `Persistent` folder on Tails OS).
-2. Double-click `VideoDownloader.desktop` OR run `./start.sh` in the terminal.
+1. Extract this archive into any folder.
+2. Double-click `VideoDownloader.desktop` OR run `./start.sh` in terminal.
 3. Your browser will open to: http://127.0.0.1:3000
 
-## Notes for Tails OS:
-- All connections are automatically routed through Tor by Tails OS firewall.
+## Notes:
+- Fully portable: includes bundled Node.js, yt-dlp, and ffmpeg.
 - Downloads are saved to the `downloads/` folder inside this directory.
 EOF
 
