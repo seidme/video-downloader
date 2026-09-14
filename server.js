@@ -295,8 +295,8 @@ function getRandomCookieFile() {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-// Helper: Common yt-dlp arguments (cookies, optional proxy, optional player client)
-function getYtDlpCommonArgs() {
+// Helper: Common yt-dlp arguments (cookies, optional proxy, optional player client, optional client tokens)
+function getYtDlpCommonArgs(extraOpts = {}) {
   const common = [];
 
   // Enable Node.js runtime for solving YouTube JS challenges (n-sig)
@@ -316,6 +316,14 @@ function getYtDlpCommonArgs() {
   // (We do not force android by default, avoiding automatic quality downgrades to 360p)
   if (process.env.YTDLP_PLAYER_CLIENT) {
     common.push('--extractor-args', `youtube:player_client=${process.env.YTDLP_PLAYER_CLIENT}`);
+  }
+
+  // Client-supplied Proof of Origin (PO) token and Visitor Data (e.g. from Chrome extension)
+  if (extraOpts.poToken) {
+    common.push('--extractor-args', `youtube:po_token=web+${extraOpts.poToken}`);
+  }
+  if (extraOpts.visitorData) {
+    common.push('--extractor-args', `youtube:visitor_data=${extraOpts.visitorData}`);
   }
 
   return common;
@@ -419,6 +427,20 @@ app.get('/api/download-portable', (req, res) => {
   });
 });
 
+// GET /api/download-extension - Download Chrome extension zip
+app.get('/api/download-extension', (req, res) => {
+  const distFile = path.join(__dirname, 'dist', 'chrome-extension.zip');
+  if (!fs.existsSync(distFile)) {
+    return res.status(404).json({ error: 'Extension package not yet compiled.' });
+  }
+
+  res.download(distFile, 'video-downloader-extension.zip', (err) => {
+    if (err && !res.headersSent) {
+      res.status(500).json({ error: 'Failed to download extension package.' });
+    }
+  });
+});
+
 // POST /api/admin/cookies - Securely upload or update cookie files
 app.post('/api/admin/cookies', (req, res) => {
   const { password, cookies, filename } = req.body || {};
@@ -505,7 +527,7 @@ app.get('/api/stats', (req, res) => {
 
 // POST /api/info - Fetch metadata for any video URL
 app.post('/api/info', async (req, res) => {
-  const { url } = req.body;
+  const { url, poToken, visitorData } = req.body;
   if (!url || typeof url !== 'string') {
     return res.status(400).json({ error: 'A valid URL is required.' });
   }
@@ -517,7 +539,7 @@ app.post('/api/info', async (req, res) => {
     '--dump-single-json',
     '--no-warnings',
     '--no-playlist',
-    ...getYtDlpCommonArgs(),
+    ...getYtDlpCommonArgs({ poToken, visitorData }),
     trimmedUrl
   ];
 
@@ -643,7 +665,7 @@ app.post('/api/info', async (req, res) => {
 
 // POST /api/download/start - Initiate asynchronous download
 app.post('/api/download/start', (req, res) => {
-  const { url, type, quality, title, duration, bypassPassword } = req.body;
+  const { url, type, quality, title, duration, bypassPassword, poToken, visitorData } = req.body;
   if (!url) {
     return res.status(400).json({ error: 'URL is required.' });
   }
@@ -782,7 +804,7 @@ app.post('/api/download/start', (req, res) => {
     '--progress-template',
     'PROGRESS:%(progress._percent_str)s|%(progress._speed_str)s|%(progress._eta_str)s|%(progress.total_bytes_estimate_str)s',
     '--ffmpeg-location', FFMPEG_BIN,
-    ...getYtDlpCommonArgs(),
+    ...getYtDlpCommonArgs({ poToken, visitorData }),
     '-o', outputTemplate
   ];
 

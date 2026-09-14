@@ -1261,3 +1261,148 @@ body {
   font-family: monospace;
 }
 
+/* Extension Badge & Modal */
+.btn-extension-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--text-main);
+  padding: 8px 16px;
+  border-radius: 9999px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(10px);
+}
+
+.btn-extension-badge:hover {
+  background: rgba(99, 102, 241, 0.18);
+  border-color: rgba(99, 102, 241, 0.5);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.btn-extension-badge.installed {
+  border-color: rgba(16, 185, 129, 0.4);
+  background: rgba(16, 185, 129, 0.1);
+  color: #34d399;
+}
+
+.ext-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: #94a3b8;
+  display: inline-block;
+}
+
+.btn-extension-badge.installed .ext-status-dot {
+  background-color: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+}
+
+.ext-modal-card {
+  max-width: 560px;
+}
+
+.ext-modal-tabs {
+  display: flex;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 4px;
+  margin-bottom: 16px;
+  gap: 4px;
+}
+
+.ext-tab-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  padding: 8px 12px;
+  border-radius: calc(var(--radius-md) - 2px);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ext-tab-btn:hover {
+  color: var(--text-main);
+}
+
+.ext-tab-btn.active {
+  background: var(--gradient-primary);
+  color: white;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
+}
+
+.bookmarklet-drag-box {
+  background: rgba(255, 255, 255, 0.03);
+  border: 2px dashed rgba(255, 255, 255, 0.16);
+  border-radius: var(--radius-md);
+  padding: 22px;
+  text-align: center;
+  margin: 14px 0;
+}
+
+.bookmarklet-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--gradient-primary);
+  color: white !important;
+  padding: 10px 24px;
+  border-radius: 9999px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-decoration: none !important;
+  cursor: grab;
+  box-shadow: 0 4px 15px rgba(99, 102, 241, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.bookmarklet-btn:active {
+  cursor: grabbing;
+}
+
+.bookmarklet-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(99, 102, 241, 0.5);
+}
+
+.bookmarklet-drag-hint {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 10px;
+}
+
+.ext-download-box {
+  text-align: center;
+  padding: 18px 0;
+}
+
+.primary-download-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--gradient-primary);
+  color: white !important;
+  padding: 11px 24px;
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none !important;
+  box-shadow: 0 4px 15px rgba(99, 102, 241, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.primary-download-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(99, 102, 241, 0.5);
+}
+

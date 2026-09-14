@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Video Downloader</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <div class="brand">
+        <div class="logo-circle">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+        </div>
+        <span class="brand-title">Downloader</span>
+      </div>
+
+      <div class="header-actions">
+        <div id="serverStatus" class="status-pill offline" title="Checking server connection...">
+          <span class="status-dot"></span>
+          <span id="statusText">Connecting...</span>
+        </div>
+        <button id="settingsBtn" class="icon-btn" title="Settings" aria-label="Settings">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main View -->
+    <main id="mainView" class="main-content">
+      <!-- Media Card -->
+      <div class="media-card">
+        <div id="mediaThumbContainer" class="media-thumb-wrapper">
+          <img id="mediaThumb" class="media-thumb hidden" alt="Thumbnail" />
+          <div id="mediaThumbPlaceholder" class="thumb-placeholder">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+          </div>
+        </div>
+        <div class="media-details">
+          <div id="mediaTitle" class="media-title" title="Current tab title">Loading active tab...</div>
+          <div id="mediaDomain" class="media-domain">-</div>
+        </div>
+      </div>
+
+      <!-- Mode Selector -->
+      <div class="mode-switch">
+        <button id="modeAudio" class="mode-btn active" type="button">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 18V5l12-2v13"></path>
+            <circle cx="6" cy="18" r="3"></circle>
+            <circle cx="18" cy="16" r="3"></circle>
+          </svg>
+          Audio
+        </button>
+        <button id="modeVideo" class="mode-btn" type="button">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
+            <line x1="7" y1="2" x2="7" y2="22"></line>
+            <line x1="17" y1="2" x2="17" y2="22"></line>
+            <line x1="2" y1="12" x2="22" y2="12"></line>
+          </svg>
+          Video
+        </button>
+      </div>
+
+      <!-- Format & Quality Grid -->
+      <div class="options-grid">
+        <div class="field-group">
+          <label class="field-label" for="qualitySelect">Quality</label>
+          <select id="qualitySelect" class="styled-select">
+            <!-- Populated dynamically based on mode -->
+            <option value="320k" selected>320 kbps (HQ)</option>
+            <option value="256k">256 kbps</option>
+            <option value="192k">192 kbps</option>
+            <option value="128k">128 kbps</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="formatSelect">Format</label>
+          <select id="formatSelect" class="styled-select">
+            <option value="mp3" selected>MP3</option>
+            <option value="m4a">M4A</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Action Button -->
+      <button id="downloadBtn" class="primary-btn" type="button">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+        <span id="downloadBtnText">Download Audio (320k)</span>
+      </button>
+
+      <!-- Progress Card (hidden by default) -->
+      <div id="progressCard" class="progress-card hidden">
+        <div class="progress-header">
+          <span id="progressStatus" class="progress-status">Initiating download...</span>
+          <span id="progressPercent" class="progress-percent">0%</span>
+        </div>
+        <div class="progress-track">
+          <div id="progressBar" class="progress-bar" style="width: 0%"></div>
+        </div>
+        <div class="progress-footer">
+          <span id="progressDetail" class="progress-detail">Connecting to engine...</span>
+          <button id="cancelBtn" class="cancel-btn" type="button">Cancel</button>
+        </div>
+      </div>
+
+      <!-- Feedback Alert -->
+      <div id="alertBox" class="alert-box hidden">
+        <span id="alertMsg"></span>
+      </div>
+    </main>
+
+    <!-- Settings Drawer / View -->
+    <div id="settingsView" class="settings-drawer hidden">
+      <div class="settings-header">
+        <h2 class="settings-title">Extension Settings</h2>
+        <button id="closeSettingsBtn" class="icon-btn" aria-label="Close settings">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <div class="settings-body">
+        <div class="field-group">
+          <label class="field-label" for="settingServerUrl">Downloader Server URL</label>
+          <input id="settingServerUrl" class="styled-input" type="url" placeholder="https://video.codeeve.com" />
+          <span class="field-hint">Your deployed or local downloader endpoint.</span>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label" for="settingPassword">Bypass Password</label>
+          <input id="settingPassword" class="styled-input" type="password" placeholder="Hint: slija" />
+          <span class="field-hint">Unlocks files &gt; 20m/3h and portable binaries.</span>
+        </div>
+
+        <div class="field-group checkbox-group">
+          <label class="checkbox-label" for="settingAutoToken">
+            <input id="settingAutoToken" type="checkbox" checked />
+            <span class="checkbox-custom"></span>
+            <span class="checkbox-text">Auto-pass real session / visitor token on YouTube</span>
+          </label>
+          <span class="field-hint">Extracts BotGuard visitor info from active tab to satisfy YouTube checks.</span>
+        </div>
+
+        <div class="settings-actions">
+          <button id="testConnectionBtn" class="secondary-btn" type="button">Test Connection</button>
+          <button id="saveSettingsBtn" class="primary-btn" type="button">Save Settings</button>
+        </div>
+        <div id="settingsAlert" class="settings-alert hidden"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

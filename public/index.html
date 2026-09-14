@@ -38,6 +38,10 @@
       </div>
 
       <div class="navbar-actions">
+        <button type="button" class="btn-extension-badge" id="openExtModalBtn" title="Get 1-click Browser Extension or Bookmarklet">
+          <span class="ext-status-dot" id="extStatusDot"></span>
+          <span id="extBtnLabel">Browser Extension</span>
+        </button>
         <button type="button" class="btn-run-local" id="openLocalModalBtn" title="Download portable package to run locally on Linux">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
@@ -367,6 +371,75 @@
             <li>Double-click <code>VideoDownloader.desktop</code> (or run <code>./start.sh</code>).</li>
             <li>Opens automatically at <code>http://127.0.0.1:3000</code>.</li>
           </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Browser Extension & Bookmarklet Modal -->
+  <div class="modal-overlay" id="extModal" style="display: none;">
+    <div class="modal-card ext-modal-card">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <span class="modal-icon">🧩</span>
+          <h3>1-Click Browser Tools</h3>
+        </div>
+        <button type="button" class="modal-close" id="closeExtModalBtn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="ext-modal-tabs">
+          <button type="button" class="ext-tab-btn active" id="tabBookmarkletBtn">⚡ 1-Click Bookmarklet (Instant)</button>
+          <button type="button" class="ext-tab-btn" id="tabExtensionBtn">🧩 Chrome Extension</button>
+        </div>
+
+        <!-- Tab 1: Bookmarklet -->
+        <div class="ext-tab-content" id="tabBookmarkletContent">
+          <p class="modal-desc">
+            <strong>Zero installation needed!</strong> Drag the button below to your browser's Bookmarks/Favorites bar. Whenever you are on YouTube, Twitter, Instagram, or Reddit, simply click the bookmark to instantly download the media.
+          </p>
+
+          <div class="bookmarklet-drag-box">
+            <a href="#" class="bookmarklet-btn" id="bookmarkletLink" title="Drag me to your Bookmarks Bar">
+              ⬇️ Download Media
+            </a>
+            <p class="bookmarklet-drag-hint">⬆️ Drag this button directly to your browser's Bookmarks bar</p>
+          </div>
+
+          <div class="local-steps">
+            <h4>How it works:</h4>
+            <ol>
+              <li>Make sure your browser bookmarks bar is visible (<code>Ctrl+Shift+B</code> or <code>Cmd+Shift+B</code>).</li>
+              <li>Drag the <strong>"⬇️ Download Media"</strong> button above into your bookmarks bar.</li>
+              <li>Go to any video on YouTube, Reddit, Instagram, or Twitter and click that bookmark!</li>
+            </ol>
+          </div>
+        </div>
+
+        <!-- Tab 2: Chrome Extension -->
+        <div class="ext-tab-content" id="tabExtensionContent" style="display: none;">
+          <p class="modal-desc">
+            Dedicated Chrome extension with a popup UI, live speed/ETA progress bar, and automatic YouTube bot verification token extraction.
+          </p>
+
+          <div class="ext-download-box">
+            <a href="/api/download-extension" class="primary-download-btn" id="downloadExtZipBtn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              Download Extension (.zip)
+            </a>
+          </div>
+
+          <div class="local-steps">
+            <h4>Install in Chrome (15 seconds):</h4>
+            <ol>
+              <li>Download and extract <code>video-downloader-extension.zip</code>.</li>
+              <li>Open <code>chrome://extensions</code> in Chrome and toggle <strong>Developer mode</strong> ON.</li>
+              <li>Click <strong>Load unpacked</strong> and select the extracted folder.</li>
+            </ol>
+          </div>
         </div>
       </div>
     </div>

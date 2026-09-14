@@ -803,3 +803,94 @@ if (downloadPortableBtn && localPasswordInput) {
   });
 }
 
+// ----------------------------------------------------
+// Browser Extension & Bookmarklet Modal Logic
+// ----------------------------------------------------
+const openExtModalBtn = document.getElementById('openExtModalBtn');
+const closeExtModalBtn = document.getElementById('closeExtModalBtn');
+const extModal = document.getElementById('extModal');
+const extBtnLabel = document.getElementById('extBtnLabel');
+const tabBookmarkletBtn = document.getElementById('tabBookmarkletBtn');
+const tabExtensionBtn = document.getElementById('tabExtensionBtn');
+const tabBookmarkletContent = document.getElementById('tabBookmarkletContent');
+const tabExtensionContent = document.getElementById('tabExtensionContent');
+const bookmarkletLink = document.getElementById('bookmarkletLink');
+
+// Dynamic Bookmarklet code pointing to current origin
+if (bookmarkletLink) {
+  const currentOrigin = window.location.origin;
+  bookmarkletLink.href = `javascript:(function(){var u=encodeURIComponent(window.location.href);window.open('${currentOrigin}/?url='+u,'_blank');})();`;
+}
+
+// Check if Chrome extension is installed and active
+function markExtensionActive() {
+  if (openExtModalBtn && extBtnLabel) {
+    openExtModalBtn.classList.add('installed');
+    extBtnLabel.textContent = 'Extension Active';
+    openExtModalBtn.title = 'Extension is active in this browser. Click to view tools.';
+  }
+}
+
+if (document.documentElement.getAttribute('data-extension-installed') === 'true') {
+  markExtensionActive();
+}
+
+window.addEventListener('message', (e) => {
+  if (e.data && e.data.type === 'VIDEO_DOWNLOADER_EXTENSION_READY') {
+    markExtensionActive();
+  }
+});
+
+// Modal Toggles
+if (openExtModalBtn && extModal) {
+  openExtModalBtn.addEventListener('click', () => {
+    extModal.style.display = 'flex';
+  });
+
+  if (closeExtModalBtn) {
+    closeExtModalBtn.addEventListener('click', () => {
+      extModal.style.display = 'none';
+    });
+  }
+
+  extModal.addEventListener('click', (e) => {
+    if (e.target === extModal) {
+      extModal.style.display = 'none';
+    }
+  });
+}
+
+// Modal Tabs
+if (tabBookmarkletBtn && tabExtensionBtn && tabBookmarkletContent && tabExtensionContent) {
+  tabBookmarkletBtn.addEventListener('click', () => {
+    tabBookmarkletBtn.classList.add('active');
+    tabExtensionBtn.classList.remove('active');
+    tabBookmarkletContent.style.display = 'block';
+    tabExtensionContent.style.display = 'none';
+  });
+
+  tabExtensionBtn.addEventListener('click', () => {
+    tabExtensionBtn.classList.add('active');
+    tabBookmarkletBtn.classList.remove('active');
+    tabExtensionContent.style.display = 'block';
+    tabBookmarkletContent.style.display = 'none';
+  });
+}
+
+// ----------------------------------------------------
+// Incoming ?url= Parameter Auto-Inspection
+// ----------------------------------------------------
+document.addEventListener('DOMContentLoaded', () => {
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    const targetUrl = urlParams.get('url');
+    if (targetUrl && videoUrlInput) {
+      videoUrlInput.value = targetUrl;
+      setTimeout(() => {
+        fetchVideoInfo(targetUrl);
+      }, 300);
+    }
+  } catch (err) {
+    console.warn('Auto-inspect error:', err);
+  }
+});

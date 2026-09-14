@@ -48,6 +48,7 @@ echo "📁 Copying application source files..."
 cp "$ROOT_DIR/server.js" ./
 cp "$ROOT_DIR/package.json" ./
 cp -r "$ROOT_DIR/public" ./
+cp -r "$ROOT_DIR/chrome-extension" ./
 cp "$ROOT_DIR/start.sh" ./
 cp "$ROOT_DIR/VideoDownloader.desktop" ./
 chmod +x start.sh VideoDownloader.desktop
