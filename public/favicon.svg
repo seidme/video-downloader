@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8a4bff"/>
+      <stop offset="50%" stop-color="#5b46f6"/>
+      <stop offset="100%" stop-color="#00d2ff"/>
+    </linearGradient>
+    <linearGradient id="arrowGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#38bdf8"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="124" fill="url(#bgGrad)"/>
+  <rect x="6" y="6" width="500" height="500" rx="118" stroke="rgba(255,255,255,0.25)" stroke-width="6"/>
+  <!-- Smooth Codeeve C Arc -->
+  <path d="M356 168 C324 122 278 106 226 106 C140 106 88 172 88 256 C88 340 140 406 226 406 C278 406 324 390 356 344" 
+        stroke="#ffffff" stroke-width="52" stroke-linecap="round"/>
+  <!-- Download Arrow inside C -->
+  <path d="M260 160 V318 M192 254 L260 322 L328 254" 
+        stroke="url(#arrowGrad)" stroke-width="46" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

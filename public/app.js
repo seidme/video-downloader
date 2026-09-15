@@ -820,6 +820,47 @@ const bookmarkletLink = document.getElementById('bookmarkletLink');
 if (bookmarkletLink) {
   const bCode = `javascript:(function(){var u=encodeURIComponent(window.location.href);var to=setTimeout(function(){window.open('https://video.codeeve.com/?url='+u,'_blank');},350);try{fetch('http://127.0.0.1:3000/api/health',{mode:'no-cors'}).then(function(){clearTimeout(to);window.open('http://127.0.0.1:3000/?url='+u,'_blank');}).catch(function(){clearTimeout(to);window.open('https://video.codeeve.com/?url='+u,'_blank');});}catch(e){clearTimeout(to);window.open('https://video.codeeve.com/?url='+u,'_blank');}})();`;
   bookmarkletLink.href = bCode;
+
+  // 10-second subtle blink animation upon dropping bookmark
+  let blinkTimer = null;
+  bookmarkletLink.addEventListener('dragend', () => {
+    const banner = document.getElementById('bookmarkletDroppedBanner');
+    const hint = document.getElementById('bookmarkletDragHint');
+    
+    bookmarkletLink.classList.add('blinking-highlight');
+    if (banner) banner.style.display = 'flex';
+    if (hint) hint.style.display = 'none';
+
+    if (blinkTimer) clearTimeout(blinkTimer);
+    blinkTimer = setTimeout(() => {
+      bookmarkletLink.classList.remove('blinking-highlight');
+      if (banner) banner.style.display = 'none';
+      if (hint) hint.style.display = 'block';
+    }, 10000); // exactly 10 seconds
+  });
+
+
+  const bookmarkletCodeText = document.getElementById('bookmarkletCodeText');
+  const copyBookmarkletCodeBtn = document.getElementById('copyBookmarkletCodeBtn');
+  if (bookmarkletCodeText) {
+    bookmarkletCodeText.textContent = bCode;
+  }
+  if (copyBookmarkletCodeBtn) {
+    copyBookmarkletCodeBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(bCode);
+        const orig = copyBookmarkletCodeBtn.innerHTML;
+        copyBookmarkletCodeBtn.innerHTML = '✓ Copied!';
+        copyBookmarkletCodeBtn.classList.add('copied');
+        setTimeout(() => {
+          copyBookmarkletCodeBtn.innerHTML = orig;
+          copyBookmarkletCodeBtn.classList.remove('copied');
+        }, 2000);
+      } catch (err) {
+        console.error('Failed to copy bookmarklet code:', err);
+      }
+    });
+  }
 }
 
 // Check if Chrome extension is installed and active
@@ -912,3 +953,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.warn('Auto-inspect error:', err);
   }
 });
+
+const openLocalFromBookmarkletBtn = document.getElementById('openLocalFromBookmarkletBtn');
+if (openLocalFromBookmarkletBtn) {
+  openLocalFromBookmarkletBtn.addEventListener('click', () => {
+    if (extModal) extModal.style.display = 'none';
+    if (openLocalModalBtn) openLocalModalBtn.click();
+  });
+}

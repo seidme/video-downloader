@@ -235,19 +235,23 @@ const jobs = new Map();
 
 // Helper: Find binary paths
 function getBinPath(binName) {
+  const isWin = process.platform === 'win32';
+  const nameWithExt = isWin && !binName.endsWith('.exe') ? `${binName}.exe` : binName;
   const customPaths = [
+    path.join(__dirname, 'bin', nameWithExt),
     path.join(__dirname, 'bin', binName),
     `/opt/homebrew/bin/${binName}`,
     `/usr/local/bin/${binName}`,
     `/usr/bin/${binName}`,
+    nameWithExt,
     binName
   ];
   for (const p of customPaths) {
-    if (p.includes('/') && fs.existsSync(p)) {
+    if ((p.includes('/') || p.includes('\\')) && fs.existsSync(p)) {
       return p;
     }
   }
-  return binName;
+  return isWin ? nameWithExt : binName;
 }
 
 const YTDLP_BIN = getBinPath('yt-dlp');
@@ -427,9 +431,22 @@ app.get('/api/download-portable', (req, res) => {
   });
 });
 
-// GET /api/download-extension - Download Chrome extension zip
+// GET /api/download-extension - Download Chrome extension zip (auto-compiles if missing)
 app.get('/api/download-extension', (req, res) => {
-  const distFile = path.join(__dirname, 'dist', 'chrome-extension.zip');
+  const distDir = path.join(__dirname, 'dist');
+  const distFile = path.join(distDir, 'chrome-extension.zip');
+  
+  if (!fs.existsSync(distFile)) {
+    try {
+      if (!fs.existsSync(distDir)) fs.mkdirSync(distDir, { recursive: true });
+      const extDir = path.join(__dirname, 'chrome-extension');
+      execSync(`cd "${extDir}" && zip -rq "${distFile}" . -x "*.DS_Store"`);
+      console.log('📦 Auto-compiled chrome-extension.zip on demand');
+    } catch (e) {
+      console.error('Failed to auto-generate chrome-extension.zip:', e);
+    }
+  }
+
   if (!fs.existsSync(distFile)) {
     return res.status(404).json({ error: 'Extension package not yet compiled.' });
   }

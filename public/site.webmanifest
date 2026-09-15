@@ -1,0 +1,21 @@
+{
+  "name": "Codeeve - Video & Audio Downloader",
+  "short_name": "Codeeve -  Download mp3/4",
+  "description": "Universal Video & Audio Downloader supporting YouTube, TikTok, Instagram, Twitter/X and 1,800+ platforms.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#090b10",
+  "theme_color": "#8a4bff",
+  "icons": [
+    {
+      "src": "/favicon-32x32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}

@@ -51,6 +51,9 @@ cp -r "$ROOT_DIR/public" ./
 cp -r "$ROOT_DIR/chrome-extension" ./
 cp "$ROOT_DIR/start.sh" ./
 cp "$ROOT_DIR/VideoDownloader.desktop" ./
+cp "$ROOT_DIR/VideoDownloader.bat" ./ 2>/dev/null || true
+cp "$ROOT_DIR/start.bat" ./ 2>/dev/null || true
+cp "$ROOT_DIR/create-desktop-shortcut.bat" ./ 2>/dev/null || true
 chmod +x start.sh VideoDownloader.desktop
 
 # 5. Install minimal production dependencies

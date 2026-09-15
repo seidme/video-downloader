@@ -1127,7 +1127,7 @@ body {
 }
 
 .modal-card {
-  background: var(--bg-card);
+  background: #111520;
   border: 1px solid var(--border-subtle);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6), 0 0 40px rgba(138, 75, 255, 0.15);
   border-radius: var(--radius-lg);
@@ -1406,3 +1406,172 @@ body {
   box-shadow: 0 8px 25px rgba(99, 102, 241, 0.5);
 }
 
+
+/* Brand Company Prefix */
+.brand-company {
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.02em;
+}
+
+/* Bookmarklet Manual Code Section */
+.bookmarklet-code-box {
+  margin-top: 16px;
+  padding: 14px 16px;
+  background: rgba(13, 16, 24, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+}
+
+.bookmarklet-code-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.bookmarklet-code-header .code-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.btn-copy-code {
+  background: rgba(138, 75, 255, 0.2);
+  border: 1px solid rgba(138, 75, 255, 0.4);
+  color: #c4b5fd;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-copy-code:hover {
+  background: rgba(138, 75, 255, 0.35);
+  color: #fff;
+}
+
+.btn-copy-code.copied {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: rgba(16, 185, 129, 0.5);
+  color: #6ee7b7;
+}
+
+.bookmarklet-code-pre {
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.72rem;
+  color: #38bdf8;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 80px;
+  overflow-y: auto;
+  user-select: all;
+}
+
+.bookmarklet-code-hint {
+  font-size: 0.74rem;
+  color: var(--text-dim);
+  margin-top: 8px;
+  line-height: 1.4;
+}
+
+.bookmarklet-code-hint strong {
+  color: var(--text-muted);
+}
+
+/* 10-second subtle blink animation for post-drop identification */
+@keyframes subtleBlinkPulse {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 25px rgba(0, 210, 255, 0.9), 0 0 45px rgba(138, 75, 255, 0.6);
+    transform: scale(1.03);
+  }
+  50% {
+    opacity: 0.55;
+    box-shadow: 0 0 6px rgba(138, 75, 255, 0.25);
+    transform: scale(0.98);
+  }
+}
+
+.bookmarklet-btn.blinking-highlight {
+  animation: subtleBlinkPulse 1.25s ease-in-out infinite !important;
+  outline: 2px solid #00d2ff;
+}
+
+.bookmarklet-dropped-banner {
+  margin-top: 12px;
+  padding: 8px 14px;
+  background: rgba(0, 210, 255, 0.12);
+  border: 1px solid rgba(0, 210, 255, 0.4);
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  color: #7dd3fc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  animation: subtleBlinkPulse 1.25s ease-in-out infinite;
+}
+
+.bookmarklet-dropped-banner strong {
+  color: #fff;
+}
+
+/* Local Experience Callout in Bookmarklet Modal */
+.local-experience-box {
+  background: rgba(138, 75, 255, 0.12);
+  border: 1px solid rgba(138, 75, 255, 0.3);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.local-exp-text {
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: #cbd5e1;
+}
+
+.local-exp-text strong {
+  color: #fff;
+}
+
+.btn-run-local-inline {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent-gradient);
+  color: #fff;
+  border: none;
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(138, 75, 255, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  white-space: nowrap;
+}
+
+.btn-run-local-inline:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(138, 75, 255, 0.5);
+}
+
+@media (max-width: 640px) {
+  .local-experience-box {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

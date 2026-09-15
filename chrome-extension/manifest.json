@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "Video Downloader",
+  "name": "Codeeve - Video & Audio Downloader",
+  "short_name": "Codeeve - Download mp3/4",
   "version": "1.0.0",
-  "description": "1-Click video & audio downloader powered by your private self-hosted downloader.",
+  "description": "Universal Video & Audio Downloader supporting YouTube, TikTok, Instagram, Twitter/X and 1,800+ platforms.",
   "permissions": [
     "activeTab",
     "storage",
@@ -20,7 +21,9 @@
         "*://127.0.0.1/*",
         "*://video.codeeve.com/*"
       ],
-      "js": ["content-inject.js"],
+      "js": [
+        "content-inject.js"
+      ],
       "run_at": "document_start"
     }
   ],
