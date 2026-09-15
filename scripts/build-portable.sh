@@ -16,33 +16,57 @@ mkdir -p "$DIST_DIR"
 
 cd "$BUILD_DIR/video-downloader"
 
-# 1. Download official yt-dlp binaries (Linux + Windows)
-echo "⬇️ Fetching standalone yt-dlp binaries..."
-curl -fsSL "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp" -o bin/yt-dlp
-curl -fsSL "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe" -o bin/yt-dlp.exe
+# Setup binary cache directory
+CACHE_DIR="${PORTABLE_CACHE_DIR:-$ROOT_DIR/.cache-bin}"
+mkdir -p "$CACHE_DIR"
+
+# 1. Official yt-dlp binaries (Linux + Windows) with caching
+if [ ! -f "$CACHE_DIR/yt-dlp" ] || [ ! -f "$CACHE_DIR/yt-dlp.exe" ]; then
+  echo "⬇️ Fetching standalone yt-dlp binaries (caching for future builds)..."
+  curl -fsSL "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp" -o "$CACHE_DIR/yt-dlp"
+  curl -fsSL "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe" -o "$CACHE_DIR/yt-dlp.exe"
+  chmod +x "$CACHE_DIR/yt-dlp"
+else
+  echo "⚡ Using cached standalone yt-dlp binaries..."
+fi
+cp "$CACHE_DIR/yt-dlp" bin/yt-dlp
+cp "$CACHE_DIR/yt-dlp.exe" bin/yt-dlp.exe
 chmod +x bin/yt-dlp
 
-# 2. Download official static Linux x86_64 ffmpeg
-echo "⬇️ Fetching static Linux ffmpeg build..."
-FFMPEG_URL="https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz"
-curl -fsSL "$FFMPEG_URL" -o /tmp/ffmpeg-static.tar.xz
-mkdir -p /tmp/ffmpeg-extracted
-tar -xf /tmp/ffmpeg-static.tar.xz -C /tmp/ffmpeg-extracted --strip-components=1
-cp /tmp/ffmpeg-extracted/ffmpeg bin/ffmpeg
-cp /tmp/ffmpeg-extracted/ffprobe bin/ffprobe
+# 2. Official static Linux x86_64 ffmpeg with caching
+if [ ! -f "$CACHE_DIR/ffmpeg" ] || [ ! -f "$CACHE_DIR/ffprobe" ]; then
+  echo "⬇️ Fetching static Linux ffmpeg build (caching for future builds)..."
+  FFMPEG_URL="https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz"
+  curl -fsSL "$FFMPEG_URL" -o /tmp/ffmpeg-static.tar.xz
+  mkdir -p /tmp/ffmpeg-extracted
+  tar -xf /tmp/ffmpeg-static.tar.xz -C /tmp/ffmpeg-extracted --strip-components=1
+  cp /tmp/ffmpeg-extracted/ffmpeg "$CACHE_DIR/ffmpeg"
+  cp /tmp/ffmpeg-extracted/ffprobe "$CACHE_DIR/ffprobe"
+  chmod +x "$CACHE_DIR/ffmpeg" "$CACHE_DIR/ffprobe"
+  rm -rf /tmp/ffmpeg-static.tar.xz /tmp/ffmpeg-extracted
+else
+  echo "⚡ Using cached static ffmpeg and ffprobe..."
+fi
+cp "$CACHE_DIR/ffmpeg" bin/ffmpeg
+cp "$CACHE_DIR/ffprobe" bin/ffprobe
 chmod +x bin/ffmpeg bin/ffprobe
-rm -rf /tmp/ffmpeg-static.tar.xz /tmp/ffmpeg-extracted
 
-# 3. Download official static Linux x86_64 Node.js LTS
-echo "⬇️ Fetching standalone Linux Node.js binary..."
+# 3. Official static Linux x86_64 Node.js LTS with caching
 NODE_VER="v22.14.0"
-NODE_URL="https://nodejs.org/dist/${NODE_VER}/node-${NODE_VER}-linux-x64.tar.xz"
-curl -fsSL "$NODE_URL" -o /tmp/node-linux.tar.xz
-mkdir -p /tmp/node-extracted
-tar -xf /tmp/node-linux.tar.xz -C /tmp/node-extracted --strip-components=1
-cp /tmp/node-extracted/bin/node bin/node
+if [ ! -f "$CACHE_DIR/node" ]; then
+  echo "⬇️ Fetching standalone Linux Node.js binary (caching for future builds)..."
+  NODE_URL="https://nodejs.org/dist/${NODE_VER}/node-${NODE_VER}-linux-x64.tar.xz"
+  curl -fsSL "$NODE_URL" -o /tmp/node-linux.tar.xz
+  mkdir -p /tmp/node-extracted
+  tar -xf /tmp/node-linux.tar.xz -C /tmp/node-extracted --strip-components=1
+  cp /tmp/node-extracted/bin/node "$CACHE_DIR/node"
+  chmod +x "$CACHE_DIR/node"
+  rm -rf /tmp/node-linux.tar.xz /tmp/node-extracted
+else
+  echo "⚡ Using cached standalone Node.js..."
+fi
+cp "$CACHE_DIR/node" bin/node
 chmod +x bin/node
-rm -rf /tmp/node-linux.tar.xz /tmp/node-extracted
 
 # 4. Copy app files & multi-platform launchers
 echo "📁 Copying application source files..."
