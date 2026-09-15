@@ -16,9 +16,10 @@ mkdir -p "$DIST_DIR"
 
 cd "$BUILD_DIR/video-downloader"
 
-# 1. Download official Linux x86_64 yt-dlp binary
-echo "⬇️ Fetching standalone yt-dlp binary..."
+# 1. Download official yt-dlp binaries (Linux + Windows)
+echo "⬇️ Fetching standalone yt-dlp binaries..."
 curl -fsSL "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp" -o bin/yt-dlp
+curl -fsSL "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe" -o bin/yt-dlp.exe
 chmod +x bin/yt-dlp
 
 # 2. Download official static Linux x86_64 ffmpeg
@@ -43,7 +44,7 @@ cp /tmp/node-extracted/bin/node bin/node
 chmod +x bin/node
 rm -rf /tmp/node-linux.tar.xz /tmp/node-extracted
 
-# 4. Copy app files
+# 4. Copy app files & multi-platform launchers
 echo "📁 Copying application source files..."
 cp "$ROOT_DIR/server.js" ./
 cp "$ROOT_DIR/package.json" ./
@@ -54,7 +55,9 @@ cp "$ROOT_DIR/VideoDownloader.desktop" ./
 cp "$ROOT_DIR/VideoDownloader.bat" ./ 2>/dev/null || true
 cp "$ROOT_DIR/start.bat" ./ 2>/dev/null || true
 cp "$ROOT_DIR/create-desktop-shortcut.bat" ./ 2>/dev/null || true
-chmod +x start.sh VideoDownloader.desktop
+cp "$ROOT_DIR/VideoDownloader.command" ./ 2>/dev/null || true
+cp "$ROOT_DIR/start.command" ./ 2>/dev/null || true
+chmod +x start.sh VideoDownloader.desktop VideoDownloader.command start.command 2>/dev/null || true
 
 # 5. Install minimal production dependencies
 echo "📦 Copying production node_modules..."
@@ -66,22 +69,29 @@ elif command -v npm >/dev/null 2>&1; then
   npm install --omit=dev --no-audit --no-fund
 fi
 
-# 6. Add clean README with Linux instructions
+# 6. Add clean README with multi-platform instructions
 cat << 'EOF' > README-LOCAL.md
-# Video Downloader (Portable)
+# Codeeve - Video & Audio Downloader (Portable)
 
 A self-contained, local video and audio downloader.
 Runs 100% on your machine with zero external dependencies.
 
-## Quick Start on Linux:
+## Quick Start:
 
-1. Extract this archive into any folder.
+### Windows:
+1. Extract the `.zip` archive into any folder.
+2. Double-click `VideoDownloader.bat` (or run `create-desktop-shortcut.bat`).
+3. Your browser opens automatically at: http://127.0.0.1:3000
+
+### macOS:
+1. Extract the archive into any folder.
+2. Double-click `VideoDownloader.command`.
+3. Your browser opens automatically at: http://127.0.0.1:3000
+
+### Linux:
+1. Extract the archive into any folder.
 2. Double-click `VideoDownloader.desktop` OR run `./start.sh` in terminal.
-3. Your browser will open to: http://127.0.0.1:3000
-
-## Notes:
-- Fully portable: includes bundled Node.js and dependencies.
-- Downloads are saved to the `downloads/` folder inside this directory.
+3. Your browser opens automatically at: http://127.0.0.1:3000
 EOF
 
 # 7. Add cookie placeholder (no private cookies included!)
@@ -92,12 +102,13 @@ If downloading from platforms that require login (e.g. age-restricted videos):
 Place your exported Netscape-format cookie file here named `account.txt`.
 EOF
 
-# 8. Create stripped, zero-attribution archive
-echo "📦 Compressing into zero-attribution tarball..."
+# 8. Create stripped, zero-attribution packages
+echo "📦 Compressing into zero-attribution packages..."
 cd "$BUILD_DIR"
 
 TAR_OUT="$DIST_DIR/video-downloader-linux.tar.gz"
-rm -f "$TAR_OUT"
+ZIP_OUT="$DIST_DIR/video-downloader-portable.zip"
+rm -f "$TAR_OUT" "$ZIP_OUT"
 
 # Strip host UID/GID and timestamps for zero forensic fingerprinting
 tar \
@@ -105,5 +116,13 @@ tar \
   --mtime='2026-01-01 00:00:00Z' \
   -czf "$TAR_OUT" video-downloader
 
+# Also create universal .zip archive for Windows & macOS users
+if command -v zip >/dev/null 2>&1; then
+  echo "📦 Compressing into universal ZIP for Windows and macOS..."
+  zip -rq "$ZIP_OUT" video-downloader
+fi
+
 rm -rf "$BUILD_DIR"
-echo "✅ Build completed successfully: $TAR_OUT ($(du -h "$TAR_OUT" | cut -f1))"
+echo "✅ Build completed successfully:"
+echo "   Linux tar.gz:  $TAR_OUT ($(du -h "$TAR_OUT" 2>/dev/null | cut -f1))"
+[ -f "$ZIP_OUT" ] && echo "   Universal zip: $ZIP_OUT ($(du -h "$ZIP_OUT" 2>/dev/null | cut -f1))"

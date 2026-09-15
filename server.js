@@ -419,41 +419,56 @@ app.get('/api/download-portable', (req, res) => {
     return res.status(403).json({ error: 'Unauthorized. Incorrect password. Hint: slija' });
   }
 
-  const distFile = path.join(__dirname, 'dist', 'video-downloader-linux.tar.gz');
+  const zipFile = path.join(__dirname, 'dist', 'video-downloader-portable.zip');
+  const tarFile = path.join(__dirname, 'dist', 'video-downloader-linux.tar.gz');
+
+  // Detect OS from User-Agent or query param (format=zip or format=targz)
+  const format = req.query.format;
+  const userAgent = req.headers['user-agent'] || '';
+  const isWindowsOrMac = /windows|win32|macintosh|mac os x/i.test(userAgent);
+
+  let distFile;
+  if (format === 'zip') {
+    distFile = fs.existsSync(zipFile) ? zipFile : tarFile;
+  } else if (format === 'tar' || format === 'targz') {
+    distFile = fs.existsSync(tarFile) ? tarFile : zipFile;
+  } else {
+    // Default: Windows/Mac get universal .zip, Linux gets .tar.gz
+    distFile = (isWindowsOrMac && fs.existsSync(zipFile)) ? zipFile : (fs.existsSync(tarFile) ? tarFile : zipFile);
+  }
+
   if (!fs.existsSync(distFile)) {
     return res.status(404).json({ error: 'Portable package not yet compiled. Please build it first.' });
   }
 
-  res.download(distFile, 'video-downloader-linux.tar.gz', (err) => {
+  const fileName = path.basename(distFile);
+  res.download(distFile, fileName, (err) => {
     if (err && !res.headersSent) {
       res.status(500).json({ error: 'Failed to download package.' });
     }
   });
 });
 
-// GET /api/download-extension - Download Chrome extension zip (auto-compiles if missing)
+// GET /api/download-extension - Download Chrome extension zip (auto-compiles fresh latest code on demand)
 app.get('/api/download-extension', (req, res) => {
   const distDir = path.join(__dirname, 'dist');
   const distFile = path.join(distDir, 'chrome-extension.zip');
   
-  if (!fs.existsSync(distFile)) {
-    try {
-      if (!fs.existsSync(distDir)) fs.mkdirSync(distDir, { recursive: true });
-      const extDir = path.join(__dirname, 'chrome-extension');
-      execSync(`cd "${extDir}" && zip -rq "${distFile}" . -x "*.DS_Store"`);
-      console.log('📦 Auto-compiled chrome-extension.zip on demand');
-    } catch (e) {
-      console.error('Failed to auto-generate chrome-extension.zip:', e);
-    }
+  try {
+    if (!fs.existsSync(distDir)) fs.mkdirSync(distDir, { recursive: true });
+    const extDir = path.join(__dirname, 'chrome-extension');
+    execSync(`cd "${extDir}" && zip -rq "${distFile}" . -x "*.DS_Store"`);
+  } catch (e) {
+    console.error('Failed to auto-generate chrome-extension.zip:', e);
   }
 
   if (!fs.existsSync(distFile)) {
-    return res.status(404).json({ error: 'Extension package not yet compiled.' });
+    return res.status(404).json({ error: 'Extension package not found.' });
   }
 
-  res.download(distFile, 'video-downloader-extension.zip', (err) => {
+  res.download(distFile, 'codeeve-extension.zip', (err) => {
     if (err && !res.headersSent) {
-      res.status(500).json({ error: 'Failed to download extension package.' });
+      res.status(500).json({ error: 'Failed to download extension.' });
     }
   });
 });

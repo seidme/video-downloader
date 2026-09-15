@@ -29,3 +29,6 @@ jobs:
 
             # Rebuild and restart the Docker services
             docker compose up --build -d
+
+            # Automatically bundle fresh portable packages (Linux, Windows, macOS)
+            bash scripts/build-portable.sh
