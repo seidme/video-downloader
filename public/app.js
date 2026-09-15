@@ -821,9 +821,9 @@ if (bookmarkletLink) {
   const bCode = `javascript:(function(){var u=encodeURIComponent(window.location.href);var to=setTimeout(function(){window.open('https://video.codeeve.com/?url='+u,'_blank');},350);try{fetch('http://127.0.0.1:3000/api/health',{mode:'no-cors'}).then(function(){clearTimeout(to);window.open('http://127.0.0.1:3000/?url='+u,'_blank');}).catch(function(){clearTimeout(to);window.open('https://video.codeeve.com/?url='+u,'_blank');});}catch(e){clearTimeout(to);window.open('https://video.codeeve.com/?url='+u,'_blank');}})();`;
   bookmarkletLink.href = bCode;
 
-  // 10-second subtle blink animation upon dropping bookmark
+  // 10-second blink animation upon dropping bookmark
   let blinkTimer = null;
-  bookmarkletLink.addEventListener('dragend', () => {
+  function triggerBookmarkletBlink() {
     const banner = document.getElementById('bookmarkletDroppedBanner');
     const hint = document.getElementById('bookmarkletDragHint');
     
@@ -837,7 +837,9 @@ if (bookmarkletLink) {
       if (banner) banner.style.display = 'none';
       if (hint) hint.style.display = 'block';
     }, 10000); // exactly 10 seconds
-  });
+  }
+
+  bookmarkletLink.addEventListener('dragend', triggerBookmarkletBlink);
 
 
   const bookmarkletCodeText = document.getElementById('bookmarkletCodeText');

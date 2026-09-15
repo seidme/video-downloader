@@ -1485,23 +1485,34 @@ body {
   color: var(--text-muted);
 }
 
-/* 10-second subtle blink animation for post-drop identification */
-@keyframes subtleBlinkPulse {
+.bookmarklet-btn-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
+/* 10-second blink animation for bookmarklet button upon drag/drop */
+@keyframes bookmarkletBlink {
   0%, 100% {
     opacity: 1;
-    box-shadow: 0 0 25px rgba(0, 210, 255, 0.9), 0 0 45px rgba(138, 75, 255, 0.6);
-    transform: scale(1.03);
+    box-shadow: 0 0 25px rgba(0, 210, 255, 0.95), 0 0 45px rgba(138, 75, 255, 0.7);
+    transform: scale(1.05);
+    outline: 3px solid #00d2ff;
+    outline-offset: 3px;
   }
   50% {
-    opacity: 0.55;
-    box-shadow: 0 0 6px rgba(138, 75, 255, 0.25);
+    opacity: 0.6;
+    box-shadow: 0 0 6px rgba(0, 210, 255, 0.25);
     transform: scale(0.98);
+    outline: 2px solid rgba(0, 210, 255, 0.3);
+    outline-offset: 1px;
   }
 }
 
 .bookmarklet-btn.blinking-highlight {
-  animation: subtleBlinkPulse 1.25s ease-in-out infinite !important;
-  outline: 2px solid #00d2ff;
+  animation: bookmarkletBlink 0.9s ease-in-out infinite !important;
 }
 
 .bookmarklet-dropped-banner {
@@ -1516,7 +1527,6 @@ body {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  animation: subtleBlinkPulse 1.25s ease-in-out infinite;
 }
 
 .bookmarklet-dropped-banner strong {
