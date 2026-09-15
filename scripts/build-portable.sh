@@ -125,4 +125,7 @@ fi
 rm -rf "$BUILD_DIR"
 echo "✅ Build completed successfully:"
 echo "   Linux tar.gz:  $TAR_OUT ($(du -h "$TAR_OUT" 2>/dev/null | cut -f1))"
-[ -f "$ZIP_OUT" ] && echo "   Universal zip: $ZIP_OUT ($(du -h "$ZIP_OUT" 2>/dev/null | cut -f1))"
+if [ -f "$ZIP_OUT" ]; then
+  echo "   Universal zip: $ZIP_OUT ($(du -h "$ZIP_OUT" 2>/dev/null | cut -f1))"
+fi
+exit 0
